@@ -16,5 +16,8 @@
   "folderDrop.error.noFolders": "Please drop at least one folder.",
   "folderDrop.error.readFailed": "Failed to read folder contents",
   "folderDrop.error.importFailed": "Import failed",
+  "folderDrop.error.tooManyFiles": "Too many files ({0}). Maximum allowed is {1}.",
+  "folderDrop.error.totalSizeTooLarge": "Total size ({0}) exceeds the maximum allowed ({1}).",
+  "folderDrop.error.invalidConfig": "Invalid folder drop configuration. Please contact your administrator.",
   "folderDrop.progress.uploading.bytes": "Uploading files... ({0} / {1})"
 }

@@ -16,5 +16,8 @@
   "folderDrop.error.noFolders": "Veuillez d\u00e9poser au moins un dossier.",
   "folderDrop.error.readFailed": "\u00c9chec de la lecture du contenu du dossier",
   "folderDrop.error.importFailed": "\u00c9chec de l'import",
+  "folderDrop.error.tooManyFiles": "Trop de fichiers ({0}). Le maximum autoris\u00e9 est {1}.",
+  "folderDrop.error.totalSizeTooLarge": "La taille totale ({0}) d\u00e9passe le maximum autoris\u00e9 ({1}).",
+  "folderDrop.error.invalidConfig": "Configuration du d\u00e9p\u00f4t de dossier invalide. Veuillez contacter votre administrateur.",
   "folderDrop.progress.uploading.bytes": "Envoi des fichiers... ({0} / {1})"
 }

@@ -176,8 +176,8 @@ Contributors:
     <nuxeo-dialog id="dialog" with-backdrop no-auto-focus>
       <h2>[[i18n('folderDrop.dialog.title')]]</h2>
 
-      <!-- Drop zone (visible before upload starts) -->
-      <template is="dom-if" if="[[!_uploading]]">
+      <!-- Drop zone (visible before upload starts and config is valid) -->
+      <template is="dom-if" if="[[_showDropZone(_uploading, _configValid)]]">
         <div id="dropZone"
              on-dragover="_onDragOver"
              on-dragleave="_onDragLeave"
@@ -450,6 +450,24 @@ Contributors:
         _uploadedBytes: {
           type: Number,
           value: 0
+        },
+
+        /** Whether the configuration is valid */
+        _configValid: {
+          type: Boolean,
+          value: true
+        },
+
+        /** Max number of files allowed (from config) */
+        _maxFiles: {
+          type: Number,
+          value: 500
+        },
+
+        /** Max total size in bytes allowed (from config) */
+        _maxTotalSizeInBytes: {
+          type: Number,
+          value: 2147483648
         }
       },
 
@@ -465,7 +483,31 @@ Contributors:
 
       _openDialog: function() {
         this._reset();
+        this._validateConfig();
         this.$.dialog.open();
+      },
+
+      _validateConfig: function() {
+        var config = Nuxeo.UI && Nuxeo.UI.config;
+        var rawMaxFiles = config && config.get ? config.get('folderDrop.maxFiles', '500') : '500';
+        var rawMaxSize = config && config.get ? config.get('folderDrop.maxTotalSizeInBytes', '2147483648') : '2147483648';
+
+        var maxFiles = parseInt(rawMaxFiles, 10);
+        var maxSize = parseInt(rawMaxSize, 10);
+
+        if (isNaN(maxFiles) || maxFiles <= 0 || isNaN(maxSize) || maxSize <= 0) {
+          this._configValid = false;
+          this._errorMessage = this.i18n('folderDrop.error.invalidConfig');
+          return;
+        }
+
+        this._maxFiles = maxFiles;
+        this._maxTotalSizeInBytes = maxSize;
+        this._configValid = true;
+      },
+
+      _showDropZone: function(_uploading, _configValid) {
+        return !_uploading && _configValid;
       },
 
       _reset: function() {
@@ -497,6 +539,9 @@ Contributors:
         this._hasInFlightFiles = false;
         this._totalBytes = 0;
         this._uploadedBytes = 0;
+        this._configValid = true;
+        this._maxFiles = 500;
+        this._maxTotalSizeInBytes = 2147483648;
       },
 
       _close: function() {
@@ -571,6 +616,23 @@ Contributors:
           self._fileObjects = result.files;
           self._buildTreePreview();
           self._hasTree = true;
+
+          // Check limits
+          var fileCount = result.files.length;
+          var totalSize = 0;
+          result.files.forEach(function(f) { totalSize += f.size; });
+
+          if (fileCount > self._maxFiles) {
+            self._errorMessage = self.i18n('folderDrop.error.tooManyFiles',
+              fileCount.toString(), self._maxFiles.toString());
+            return;
+          }
+          if (totalSize > self._maxTotalSizeInBytes) {
+            self._errorMessage = self.i18n('folderDrop.error.totalSizeTooLarge',
+              self._formatSize(totalSize), self._formatSize(self._maxTotalSizeInBytes));
+            return;
+          }
+
           self._canUpload = true;
         }).catch(function(err) {
           self._errorMessage = self.i18n('folderDrop.error.readFailed') + ': ' + err.message;

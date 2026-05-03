@@ -53,6 +53,24 @@ When S3 Direct Upload is **not** available, the plugin falls back to sequential 
 
 No additional configuration is needed — the plugin auto-detects the S3 provider at runtime.
 
+## Configuration
+
+The plugin enforces limits on the number of files and total size that can be uploaded in a single drop. These limits can be tuned in `nuxeo.conf` to match your deployment constraints (network speed, server capacity, Nuxeo cluster setup, etc.):
+
+| Property | Default | Description |
+|---|---|---|
+| `org.nuxeo.web.ui.folderDrop.maxFiles` | `500` | Maximum number of files allowed per drop |
+| `org.nuxeo.web.ui.folderDrop.maxTotalSizeInBytes` | `2147483648` (2 GB) | Maximum total size in bytes allowed per drop |
+
+Example `nuxeo.conf`:
+
+```
+org.nuxeo.web.ui.folderDrop.maxFiles=1000
+org.nuxeo.web.ui.folderDrop.maxTotalSizeInBytes=5368709120
+```
+
+These properties can also be overridden via an XML contribution to `org.nuxeo.runtime.ConfigurationService`.
+
 ## Default Behavior
 
 Without any additional configuration:
