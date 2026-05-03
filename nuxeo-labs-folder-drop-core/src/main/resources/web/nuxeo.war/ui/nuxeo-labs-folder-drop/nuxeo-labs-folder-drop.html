@@ -545,7 +545,8 @@ Contributors:
         var entries = [];
         for (var i = 0; i < dataTransfer.items.length; i++) {
           var item = dataTransfer.items[i];
-          var entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+          var entry = item.getAsEntry ? item.getAsEntry() :
+                      (item.webkitGetAsEntry ? item.webkitGetAsEntry() : null);
           if (entry) {
             entries.push(entry);
           }
