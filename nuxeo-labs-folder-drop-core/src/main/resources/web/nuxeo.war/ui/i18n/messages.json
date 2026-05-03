@@ -1,0 +1,20 @@
+{
+  "folderDrop.action.tooltip": "Drop Folder...",
+  "folderDrop.dialog.title": "Import Folder",
+  "folderDrop.dialog.dropLabel": "Drag and drop a folder here from your desktop",
+  "folderDrop.dialog.upload": "Upload",
+  "folderDrop.dialog.cancel": "Cancel",
+  "folderDrop.summary": "{0} folder(s), {1} file(s), {2}",
+  "folderDrop.progress.uploading.count": "Uploading files... ({0}/{1})",
+  "folderDrop.progress.uploading.file": "Uploading \"{0}\" ({1})",
+  "folderDrop.progress.resolving": "Resolving document types...",
+  "folderDrop.progress.creatingDocs.count": "Creating documents... ({0}/{1})",
+  "folderDrop.phase.uploadDone": "Files uploaded",
+  "folderDrop.phase.resolvingDone": "Document types resolved",
+  "folderDrop.success": "Import completed successfully.",
+  "folderDrop.error.noItems": "No items detected in the drop.",
+  "folderDrop.error.noFolders": "Please drop at least one folder.",
+  "folderDrop.error.readFailed": "Failed to read folder contents",
+  "folderDrop.error.importFailed": "Import failed",
+  "folderDrop.progress.uploading.bytes": "Uploading files... ({0} / {1})"
+}

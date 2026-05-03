@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<component name="nuxeo.labs.folderdrop.FolderDropService" version="1.0">
+
+  <implementation class="nuxeo.labs.folderdrop.FolderDropServiceImpl" />
+
+  <service>
+    <provide interface="nuxeo.labs.folderdrop.FolderDropService" />
+  </service>
+
+  <extension-point name="configuration">
+    <object class="nuxeo.labs.folderdrop.FolderDropDescriptor" />
+  </extension-point>
+
+  <!-- Default configuration: no callback chain -->
+  <extension target="nuxeo.labs.folderdrop.FolderDropService" point="configuration">
+    <configuration>
+      <callbackChain></callbackChain>
+    </configuration>
+  </extension>
+
+</component>

@@ -1,0 +1,20 @@
+{
+  "folderDrop.action.tooltip": "D\u00e9poser un dossier...",
+  "folderDrop.dialog.title": "Importer un dossier",
+  "folderDrop.dialog.dropLabel": "Glissez-d\u00e9posez un dossier ici depuis votre bureau",
+  "folderDrop.dialog.upload": "Envoyer",
+  "folderDrop.dialog.cancel": "Annuler",
+  "folderDrop.summary": "{0} dossier(s), {1} fichier(s), {2}",
+  "folderDrop.progress.uploading.count": "Envoi des fichiers... ({0}/{1})",
+  "folderDrop.progress.uploading.file": "Envoi de \"{0}\" ({1})",
+  "folderDrop.progress.resolving": "R\u00e9solution des types de document...",
+  "folderDrop.progress.creatingDocs.count": "Cr\u00e9ation des documents... ({0}/{1})",
+  "folderDrop.phase.uploadDone": "Fichiers envoy\u00e9s",
+  "folderDrop.phase.resolvingDone": "Types de document r\u00e9solus",
+  "folderDrop.success": "Import termin\u00e9 avec succ\u00e8s.",
+  "folderDrop.error.noItems": "Aucun \u00e9l\u00e9ment d\u00e9tect\u00e9.",
+  "folderDrop.error.noFolders": "Veuillez d\u00e9poser au moins un dossier.",
+  "folderDrop.error.readFailed": "\u00c9chec de la lecture du contenu du dossier",
+  "folderDrop.error.importFailed": "\u00c9chec de l'import",
+  "folderDrop.progress.uploading.bytes": "Envoi des fichiers... ({0} / {1})"
+}

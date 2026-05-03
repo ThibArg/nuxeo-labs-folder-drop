@@ -1,0 +1,70 @@
+/*
+ * (C) Copyright 2025 Hyland (http://hyland.com/) and others.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Contributors:
+ *     Thibaud Arguillere
+ */
+package nuxeo.labs.folderdrop;
+
+import java.io.IOException;
+
+import org.nuxeo.ecm.automation.core.annotations.Context;
+import org.nuxeo.ecm.automation.core.annotations.Operation;
+import org.nuxeo.ecm.automation.core.annotations.OperationMethod;
+import org.nuxeo.ecm.automation.core.annotations.Param;
+import org.nuxeo.ecm.core.api.Blob;
+import org.nuxeo.ecm.core.api.CoreSession;
+import org.nuxeo.ecm.core.api.NuxeoException;
+import org.nuxeo.ecm.core.api.impl.blob.StringBlob;
+import org.nuxeo.runtime.api.Framework;
+
+/**
+ * Automation operation that resolves document types for a folder tree.
+ * <p>
+ * Receives a JSON array describing the tree structure (folders and files)
+ * and returns the same array with "docType" populated for each item.
+ * <p>
+ * If no callback chain is configured, defaults are used:
+ * folders → "Folder", files → null (FileManager.Import will be used).
+ * <p>
+ * If a callback chain is configured, it is called for each item to determine
+ * the document type.
+ *
+ * @since 2025.1
+ */
+@Operation(id = FolderDropResolveTypesOp.ID, category = "Document", label = "FolderDrop: Resolve Types", description = "Resolves document types for a folder tree. Input is a JSON blob with the tree, output is the same tree with docType populated.")
+public class FolderDropResolveTypesOp {
+
+    public static final String ID = "FolderDrop.ResolveTypes";
+
+    @Context
+    protected CoreSession session;
+
+    @Param(name = "parentPath", required = true, description = "Path of the parent container document")
+    protected String parentPath;
+
+    @OperationMethod
+    public Blob run(Blob input) {
+        FolderDropService service = Framework.getService(FolderDropService.class);
+        String treeJson;
+        try {
+            treeJson = input.getString();
+        } catch (IOException e) {
+            throw new NuxeoException("Failed to read input blob", e);
+        }
+        String result = service.resolveTypes(session, treeJson, parentPath);
+        return new StringBlob(result, "application/json");
+    }
+}

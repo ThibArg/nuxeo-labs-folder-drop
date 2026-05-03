@@ -1,0 +1,1186 @@
+<!--
+(C) Copyright 2025 Hyland (http://hyland.com/) and others.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Contributors:
+    Thibaud Arguillere
+-->
+
+<dom-module id="nuxeo-labs-folder-drop">
+  <template>
+    <style>
+      :host {
+        display: inline-block;
+      }
+
+      #dropZone {
+        min-height: 200px;
+        border: 2px dashed var(--nuxeo-border, #aaa);
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        margin: 16px 0;
+        transition: border-color 0.2s, background-color 0.2s;
+        background: var(--nuxeo-page-background, #fafafa);
+      }
+
+      #dropZone.dragover {
+        border-color: var(--nuxeo-primary-color, #0066ff);
+        background-color: var(--nuxeo-light-background, #e8f0fe);
+      }
+
+      #dropZone iron-icon {
+        --iron-icon-height: 48px;
+        --iron-icon-width: 48px;
+        color: var(--nuxeo-text-light, #939caa);
+        margin-bottom: 8px;
+      }
+
+      .drop-label {
+        color: var(--nuxeo-text-light, #939caa);
+        font-size: 14px;
+      }
+
+      .progress-section {
+        margin: 16px 0;
+      }
+
+      .progress-label {
+        font-size: 13px;
+        color: var(--nuxeo-text-default, #3a3a54);
+        margin-bottom: 4px;
+      }
+
+      paper-progress {
+        width: 100%;
+        --paper-progress-active-color: var(--nuxeo-primary-color, #0066ff);
+      }
+
+      .tree-preview {
+        max-height: 250px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+        background: var(--nuxeo-box, #fff);
+        border: 1px solid var(--nuxeo-border, #e3e3e3);
+        border-radius: 4px;
+        padding: 8px 12px;
+        margin: 8px 0;
+        white-space: pre;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .error-message {
+        color: var(--nuxeo-warn-text, #d32f2f);
+        font-size: 13px;
+        margin: 8px 0;
+      }
+
+      .success-message {
+        color: var(--nuxeo-validated, #42a100);
+        font-size: 13px;
+        margin: 8px 0;
+      }
+
+      .summary {
+        font-size: 13px;
+        color: var(--nuxeo-text-default, #3a3a54);
+        margin: 4px 0;
+      }
+
+      .phase-completed {
+        font-size: 12px;
+        color: var(--nuxeo-validated, #42a100);
+        margin: 4px 0;
+      }
+
+      .phase-completed iron-icon {
+        --iron-icon-height: 16px;
+        --iron-icon-width: 16px;
+        color: var(--nuxeo-validated, #42a100);
+        margin-right: 4px;
+      }
+
+      .current-file-label {
+        margin-top: 8px;
+        font-style: italic;
+        color: var(--nuxeo-text-light, #939caa);
+      }
+
+      .in-flight-list {
+        max-height: 150px;
+        overflow-y: auto;
+        border: 1px solid var(--nuxeo-border, #e3e3e3);
+        border-radius: 4px;
+        padding: 4px 8px;
+        margin-top: 8px;
+        font-size: 12px;
+      }
+
+      .in-flight-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 2px 0;
+      }
+
+      .in-flight-item .file-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+      }
+
+      .in-flight-item .file-size {
+        color: var(--nuxeo-text-light, #939caa);
+        white-space: nowrap;
+      }
+
+      .in-flight-item paper-progress {
+        width: 80px;
+        flex-shrink: 0;
+      }
+
+      .in-flight-item .pct {
+        width: 36px;
+        text-align: right;
+        white-space: nowrap;
+        color: var(--nuxeo-text-light, #939caa);
+      }
+    </style>
+
+    <nuxeo-connection id="nx"></nuxeo-connection>
+    <nuxeo-operation id="resolveTypesOp" op="FolderDrop.ResolveTypes"></nuxeo-operation>
+
+    <!-- The action button -->
+    <paper-icon-button id="dropFolderBtn" icon="icons:folder" on-tap="_openDialog" noink></paper-icon-button>
+    <nuxeo-tooltip for="dropFolderBtn">[[i18n('folderDrop.action.tooltip')]]</nuxeo-tooltip>
+
+    <!-- The dialog -->
+    <nuxeo-dialog id="dialog" with-backdrop no-auto-focus>
+      <h2>[[i18n('folderDrop.dialog.title')]]</h2>
+
+      <!-- Drop zone (visible before upload starts) -->
+      <template is="dom-if" if="[[!_uploading]]">
+        <div id="dropZone"
+             on-dragover="_onDragOver"
+             on-dragleave="_onDragLeave"
+             on-drop="_onDrop">
+          <iron-icon icon="icons:cloud-upload"></iron-icon>
+          <div class="drop-label">[[i18n('folderDrop.dialog.dropLabel')]]</div>
+        </div>
+      </template>
+
+      <!-- Tree preview (after drop) -->
+      <template is="dom-if" if="[[_hasTree]]">
+        <div class="summary">
+          [[_treeSummary]]
+        </div>
+        <div class="tree-preview">[[_treePreview]]</div>
+      </template>
+
+      <!-- Phase: Upload files (default / sequential mode) -->
+      <template is="dom-if" if="[[_showUploadProgress]]">
+        <div class="progress-section">
+          <div class="progress-label">[[_uploadProgressLabel]]</div>
+          <paper-progress value="[[_uploadProgressValue]]" max="[[_uploadProgressMax]]"></paper-progress>
+          <!-- Current file being uploaded (sequential mode) -->
+          <template is="dom-if" if="[[_currentFileName]]">
+            <div class="progress-label current-file-label">[[i18n('folderDrop.progress.uploading.file', _currentFileName, _currentFileSize)]]</div>
+            <template is="dom-if" if="[[_showFileIndeterminate]]">
+              <paper-progress indeterminate></paper-progress>
+            </template>
+          </template>
+          <!-- In-flight files list (S3 parallel mode) -->
+          <template is="dom-if" if="[[_hasInFlightFiles]]">
+            <div class="in-flight-list">
+              <template is="dom-repeat" items="[[_inFlightFiles]]" as="inf">
+                <div class="in-flight-item">
+                  <span class="file-name">[[inf.name]]</span>
+                  <span class="file-size">[[inf.sizeLabel]]</span>
+                  <paper-progress value="[[inf.pct]]" max="100"></paper-progress>
+                  <span class="pct">[[inf.pct]]%</span>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <!-- Phase: Upload complete checkmark -->
+      <template is="dom-if" if="[[_uploadDone]]">
+        <div class="phase-completed">
+          <iron-icon icon="icons:check"></iron-icon>[[i18n('folderDrop.phase.uploadDone')]]
+        </div>
+      </template>
+
+      <!-- Phase: Resolving types (only with callback chain) -->
+      <template is="dom-if" if="[[_showResolvingProgress]]">
+        <div class="progress-section">
+          <div class="progress-label">[[i18n('folderDrop.progress.resolving')]]</div>
+          <paper-progress indeterminate></paper-progress>
+        </div>
+      </template>
+
+      <!-- Phase: Resolving complete checkmark -->
+      <template is="dom-if" if="[[_resolvingDone]]">
+        <div class="phase-completed">
+          <iron-icon icon="icons:check"></iron-icon>[[i18n('folderDrop.phase.resolvingDone')]]
+        </div>
+      </template>
+
+      <!-- Phase: Creating documents -->
+      <template is="dom-if" if="[[_showImportProgress]]">
+        <div class="progress-section">
+          <div class="progress-label">[[_importProgressLabel]]</div>
+          <paper-progress value="[[_importProgressValue]]" max="[[_importProgressMax]]"></paper-progress>
+        </div>
+      </template>
+
+      <!-- Error message -->
+      <template is="dom-if" if="[[_errorMessage]]">
+        <div class="error-message">[[_errorMessage]]</div>
+      </template>
+
+      <!-- Success message -->
+      <template is="dom-if" if="[[_successMessage]]">
+        <div class="success-message">[[_successMessage]]</div>
+      </template>
+
+      <!-- Buttons -->
+      <div class="buttons">
+        <!-- Before upload or after completion: Cancel / Close -->
+        <template is="dom-if" if="[[!_uploading]]">
+          <paper-button dialog-dismiss on-tap="_close">
+            [[_closeButtonLabel]]
+          </paper-button>
+        </template>
+
+        <!-- Upload button: visible after drop, before upload starts -->
+        <template is="dom-if" if="[[_canUpload]]">
+          <paper-button class="primary" on-tap="_startUpload">
+            [[i18n('folderDrop.dialog.upload')]]
+          </paper-button>
+        </template>
+      </div>
+    </nuxeo-dialog>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'nuxeo-labs-folder-drop',
+
+      behaviors: [Nuxeo.I18nBehavior],
+
+      properties: {
+        /** The current Folderish document */
+        document: Object,
+
+        /** Flat list of all items in the tree */
+        _items: {
+          type: Array,
+          value: function() { return []; }
+        },
+
+        /** Files (actual File objects) indexed by their position in _items */
+        _fileObjects: {
+          type: Array,
+          value: function() { return []; }
+        },
+
+        _hasTree: {
+          type: Boolean,
+          value: false
+        },
+
+        _treePreview: {
+          type: String,
+          value: ''
+        },
+
+        _treeSummary: {
+          type: String,
+          value: ''
+        },
+
+        /** True once Upload is clicked, stays true until done/error */
+        _uploading: {
+          type: Boolean,
+          value: false
+        },
+
+        /** Show "Upload" button */
+        _canUpload: {
+          type: Boolean,
+          value: false
+        },
+
+        // --- Upload phase ---
+        _showUploadProgress: {
+          type: Boolean,
+          value: false
+        },
+
+        _uploadProgressLabel: {
+          type: String,
+          value: ''
+        },
+
+        _uploadProgressValue: {
+          type: Number,
+          value: 0
+        },
+
+        _uploadProgressMax: {
+          type: Number,
+          value: 100
+        },
+
+        /** Name of the file currently being uploaded */
+        _currentFileName: {
+          type: String,
+          value: ''
+        },
+
+        /** Formatted size of the file currently being uploaded */
+        _currentFileSize: {
+          type: String,
+          value: ''
+        },
+
+        /** Show indeterminate bar for large files (> 10 MB) */
+        _showFileIndeterminate: {
+          type: Boolean,
+          value: false
+        },
+
+        _uploadDone: {
+          type: Boolean,
+          value: false
+        },
+
+        // --- Resolving phase (callback chain only) ---
+        _showResolvingProgress: {
+          type: Boolean,
+          value: false
+        },
+
+        _resolvingDone: {
+          type: Boolean,
+          value: false
+        },
+
+        // --- Import / document creation phase ---
+        _showImportProgress: {
+          type: Boolean,
+          value: false
+        },
+
+        _importProgressLabel: {
+          type: String,
+          value: ''
+        },
+
+        _importProgressValue: {
+          type: Number,
+          value: 0
+        },
+
+        _importProgressMax: {
+          type: Number,
+          value: 100
+        },
+
+        _errorMessage: {
+          type: String,
+          value: ''
+        },
+
+        _successMessage: {
+          type: String,
+          value: ''
+        },
+
+        _closeButtonLabel: {
+          type: String,
+          computed: '_computeCloseLabel(_successMessage, _errorMessage, _hasTree)'
+        },
+
+        /** Whether S3 direct upload is available */
+        _useS3: {
+          type: Boolean,
+          value: false
+        },
+
+        /** In-flight file entries for S3 parallel mode */
+        _inFlightFiles: {
+          type: Array,
+          value: function() { return []; }
+        },
+
+        /** Whether we have in-flight files to show */
+        _hasInFlightFiles: {
+          type: Boolean,
+          value: false
+        },
+
+        /** Total bytes to upload (for S3 aggregate progress) */
+        _totalBytes: {
+          type: Number,
+          value: 0
+        },
+
+        /** Bytes uploaded so far (for S3 aggregate progress) */
+        _uploadedBytes: {
+          type: Number,
+          value: 0
+        }
+      },
+
+      _computeCloseLabel: function(_successMessage, _errorMessage, _hasTree) {
+        if (_successMessage || _errorMessage) {
+          return this.i18n('command.close');
+        }
+        if (_hasTree) {
+          return this.i18n('folderDrop.dialog.cancel');
+        }
+        return this.i18n('command.close');
+      },
+
+      _openDialog: function() {
+        this._reset();
+        this.$.dialog.open();
+      },
+
+      _reset: function() {
+        this._items = [];
+        this._fileObjects = [];
+        this._hasTree = false;
+        this._treePreview = '';
+        this._treeSummary = '';
+        this._uploading = false;
+        this._canUpload = false;
+        this._showUploadProgress = false;
+        this._uploadProgressLabel = '';
+        this._uploadProgressValue = 0;
+        this._uploadProgressMax = 100;
+        this._currentFileName = '';
+        this._currentFileSize = '';
+        this._showFileIndeterminate = false;
+        this._uploadDone = false;
+        this._showResolvingProgress = false;
+        this._resolvingDone = false;
+        this._showImportProgress = false;
+        this._importProgressLabel = '';
+        this._importProgressValue = 0;
+        this._importProgressMax = 100;
+        this._errorMessage = '';
+        this._successMessage = '';
+        this._useS3 = false;
+        this._inFlightFiles = [];
+        this._hasInFlightFiles = false;
+        this._totalBytes = 0;
+        this._uploadedBytes = 0;
+      },
+
+      _close: function() {
+        if (this._successMessage) {
+          // Refresh the current view after successful import
+          this.fire('document-updated');
+          this.fire('navigate', { doc: this.document });
+        }
+      },
+
+      _onDragOver: function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var dropZone = this.shadowRoot.querySelector('#dropZone');
+        if (dropZone) {
+          dropZone.classList.add('dragover');
+        }
+      },
+
+      _onDragLeave: function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var dropZone = this.shadowRoot.querySelector('#dropZone');
+        if (dropZone) {
+          dropZone.classList.remove('dragover');
+        }
+      },
+
+      _onDrop: function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var dropZone = this.shadowRoot.querySelector('#dropZone');
+        if (dropZone) {
+          dropZone.classList.remove('dragover');
+        }
+
+        this._errorMessage = '';
+        this._successMessage = '';
+
+        var dataTransfer = e.dataTransfer;
+        if (!dataTransfer || !dataTransfer.items) {
+          this._errorMessage = this.i18n('folderDrop.error.noItems');
+          return;
+        }
+
+        var entries = [];
+        for (var i = 0; i < dataTransfer.items.length; i++) {
+          var item = dataTransfer.items[i];
+          var entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+          if (entry) {
+            entries.push(entry);
+          }
+        }
+
+        if (entries.length === 0) {
+          this._errorMessage = this.i18n('folderDrop.error.noFolders');
+          return;
+        }
+
+        // Check that at least one entry is a directory
+        var hasDirectory = entries.some(function(e) { return e.isDirectory; });
+        if (!hasDirectory) {
+          this._errorMessage = this.i18n('folderDrop.error.noFolders');
+          return;
+        }
+
+        var self = this;
+
+        this._readEntriesRecursively(entries).then(function(result) {
+          self._items = result.items;
+          self._fileObjects = result.files;
+          self._buildTreePreview();
+          self._hasTree = true;
+          self._canUpload = true;
+        }).catch(function(err) {
+          self._errorMessage = self.i18n('folderDrop.error.readFailed') + ': ' + err.message;
+        });
+      },
+
+      /**
+       * Recursively reads all entries from the dropped FileSystemEntry objects.
+       * Returns { items: [...flat list...], files: [...File objects...] }
+       */
+      _readEntriesRecursively: function(entries) {
+        var items = [];
+        var files = [];
+        var self = this;
+
+        function readEntry(entry, parentPath) {
+          return new Promise(function(resolve, reject) {
+            var relativePath = parentPath ? parentPath + '/' + entry.name : entry.name;
+
+            if (entry.isFile) {
+              entry.file(function(file) {
+                var fileIndex = files.length;
+                files.push(file);
+                items.push({
+                  name: entry.name,
+                  relativePath: relativePath,
+                  isFolder: false,
+                  mimeType: file.type || 'application/octet-stream',
+                  size: file.size,
+                  fileIndex: fileIndex
+                });
+                resolve();
+              }, reject);
+            } else if (entry.isDirectory) {
+              items.push({
+                name: entry.name,
+                relativePath: relativePath,
+                isFolder: true,
+                mimeType: '',
+                size: 0
+              });
+
+              var reader = entry.createReader();
+              self._readAllDirectoryEntries(reader).then(function(childEntries) {
+                var promises = childEntries.map(function(child) {
+                  return readEntry(child, relativePath);
+                });
+                return Promise.all(promises);
+              }).then(resolve).catch(reject);
+            } else {
+              resolve();
+            }
+          });
+        }
+
+        var promises = entries.map(function(entry) {
+          return readEntry(entry, '');
+        });
+
+        return Promise.all(promises).then(function() {
+          return { items: items, files: files };
+        });
+      },
+
+      /**
+       * Reads all entries from a DirectoryReader, handling the batch-reading behavior
+       * where readEntries() may return partial results.
+       */
+      _readAllDirectoryEntries: function(reader) {
+        var allEntries = [];
+
+        function readBatch() {
+          return new Promise(function(resolve, reject) {
+            reader.readEntries(function(entries) {
+              if (entries.length === 0) {
+                resolve(allEntries);
+              } else {
+                allEntries = allEntries.concat(Array.from(entries));
+                readBatch().then(resolve).catch(reject);
+              }
+            }, reject);
+          });
+        }
+
+        return readBatch();
+      },
+
+      /**
+       * Format a byte count into a human-readable string.
+       */
+      _formatSize: function(bytes) {
+        if (bytes === 0) return '0 B';
+        var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        var i = Math.floor(Math.log(bytes) / Math.log(1024));
+        if (i >= units.length) i = units.length - 1;
+        var value = bytes / Math.pow(1024, i);
+        return value.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+      },
+
+      _buildTreePreview: function() {
+        var folders = 0;
+        var fileCount = 0;
+        var totalSize = 0;
+        var lines = [];
+
+        // Sort items by relativePath for display
+        var sorted = this._items.slice().sort(function(a, b) {
+          return a.relativePath.localeCompare(b.relativePath);
+        });
+
+        sorted.forEach(function(item) {
+          var depth = item.relativePath.split('/').length - 1;
+          var indent = '';
+          for (var i = 0; i < depth; i++) {
+            indent += '  ';
+          }
+          var icon = item.isFolder ? '\uD83D\uDCC1 ' : '\uD83D\uDCC4 ';
+          lines.push(indent + icon + item.name);
+          if (item.isFolder) {
+            folders++;
+          } else {
+            fileCount++;
+            totalSize += item.size || 0;
+          }
+        });
+
+        this._treePreview = lines.join('\n');
+        this._treeSummary = this.i18n('folderDrop.summary',
+          folders.toString(), fileCount.toString(), this._formatSize(totalSize));
+      },
+
+      /**
+       * Called when the user clicks "Upload".
+       */
+      _startUpload: function() {
+        this._canUpload = false;
+        this._uploading = true;
+        this._errorMessage = '';
+
+        var self = this;
+
+        // Step 1: Upload all files to a batch
+        this._uploadFiles().then(function(batchId) {
+          self._showUploadProgress = false;
+          self._uploadDone = true;
+
+          // Step 2: Resolve types (always called; the server decides if callback applies)
+          return self._resolveTypes(batchId);
+        }).then(function(result) {
+          self._showResolvingProgress = false;
+          if (result.hadCallback) {
+            self._resolvingDone = true;
+          }
+
+          // Step 3: Create folders
+          return self._createFolders(result.resolvedItems, result.batchId);
+        }).then(function(result) {
+          // Step 4: Import files
+          return self._importFiles(result.resolvedItems, result.batchId);
+        }).then(function() {
+          self._showImportProgress = false;
+          self._uploading = false;
+          self._successMessage = self.i18n('folderDrop.success');
+        }).catch(function(err) {
+          self._showUploadProgress = false;
+          self._showResolvingProgress = false;
+          self._showImportProgress = false;
+          self._uploading = false;
+          self._errorMessage = self.i18n('folderDrop.error.importFailed') + ': ' + (err.message || err);
+        });
+      },
+
+      /**
+       * Detects if S3 direct upload is available.
+       */
+      _detectS3: function() {
+        try {
+          var config = Nuxeo.UI && Nuxeo.UI.config;
+          if (config && config.s3 && config.s3.useDirectUpload === 'true') {
+            return true;
+          }
+        } catch (e) {
+          // ignore
+        }
+        return false;
+      },
+
+      /**
+       * Uploads all files to a single batch.
+       * Returns the batchId.
+       * Uses S3 direct upload with parallel uploads when available,
+       * otherwise falls back to sequential server-side upload.
+       */
+      _uploadFiles: function() {
+        var self = this;
+        var files = this._fileObjects;
+        var totalFiles = files.length;
+
+        if (totalFiles === 0) {
+          return Promise.resolve(null);
+        }
+
+        this._useS3 = this._detectS3();
+
+        if (this._useS3) {
+          return this._uploadFilesS3(files, totalFiles);
+        }
+        return this._uploadFilesDefault(files, totalFiles);
+      },
+
+      /**
+       * Sequential upload through Nuxeo server (default provider).
+       */
+      _uploadFilesDefault: function(files, totalFiles) {
+        var self = this;
+        this._showUploadProgress = true;
+        this._uploadProgressValue = 0;
+        this._uploadProgressMax = totalFiles;
+        this._uploadProgressLabel = this.i18n('folderDrop.progress.uploading.count', '0', totalFiles.toString());
+
+        return this.$.nx.connect().then(function(client) {
+          return client.batchUpload();
+        }).then(function(uploader) {
+          self._uploader = uploader;
+          var batchId = null;
+
+          var chain = Promise.resolve();
+          var LARGE_FILE_THRESHOLD = 10 * 1024 * 1024; // 10 MB
+          files.forEach(function(file, index) {
+            chain = chain.then(function() {
+              self._currentFileName = file.name;
+              self._currentFileSize = self._formatSize(file.size);
+              self._showFileIndeterminate = file.size > LARGE_FILE_THRESHOLD;
+
+              var blob = new Nuxeo.Blob({ content: file });
+              return uploader.upload(blob).then(function(result) {
+                if (!batchId) {
+                  batchId = result.batch._batchId;
+                }
+                self._items.forEach(function(item) {
+                  if (!item.isFolder && item.fileIndex === index) {
+                    item.batchFileIndex = result.blob.fileIdx;
+                  }
+                });
+                self._uploadProgressValue = index + 1;
+                self._uploadProgressLabel = self.i18n('folderDrop.progress.uploading.count',
+                  (index + 1).toString(), totalFiles.toString());
+                self._currentFileName = '';
+                self._currentFileSize = '';
+                self._showFileIndeterminate = false;
+              });
+            });
+          });
+
+          return chain.then(function() {
+            return batchId;
+          });
+        });
+      },
+
+      /**
+       * Parallel upload via S3 direct upload provider.
+       * Concurrency limit = 5. Shows aggregate bytes progress + individual file progress.
+       */
+      _uploadFilesS3: function(files, totalFiles) {
+        var self = this;
+
+        // Calculate total bytes
+        var totalBytes = 0;
+        files.forEach(function(f) { totalBytes += f.size; });
+        this._totalBytes = totalBytes;
+        this._uploadedBytes = 0;
+
+        this._showUploadProgress = true;
+        this._uploadProgressValue = 0;
+        this._uploadProgressMax = totalBytes || 1;
+        this._uploadProgressLabel = this.i18n('folderDrop.progress.uploading.bytes',
+          '0', this._formatSize(totalBytes));
+        this._hasInFlightFiles = true;
+        this._inFlightFiles = [];
+
+        var CONCURRENCY = 5;
+
+        // Per-file tracking for loaded bytes
+        var perFileLoaded = new Array(totalFiles);
+        for (var i = 0; i < totalFiles; i++) { perFileLoaded[i] = 0; }
+
+        return this.$.nx.connect().then(function(client) {
+          return client.batchUpload();
+        }).then(function(uploader) {
+          self._uploader = uploader;
+          var batchId = null;
+          var completedCount = 0;
+          var nextIndex = 0;
+
+          // We must init the batch to get a batchId first
+          return uploader.upload(new Nuxeo.Blob({ content: files[0] }), {
+            onProgress: function(e) {
+              self._updateS3FileProgress(0, files[0], e, perFileLoaded);
+            }
+          }).then(function(result) {
+            batchId = result.batch._batchId;
+            self._items.forEach(function(item) {
+              if (!item.isFolder && item.fileIndex === 0) {
+                item.batchFileIndex = result.blob.fileIdx;
+              }
+            });
+            completedCount++;
+            perFileLoaded[0] = files[0].size;
+            self._updateS3AggregateProgress(perFileLoaded, totalBytes, completedCount, totalFiles);
+            nextIndex = 1;
+
+            // Now upload remaining files with concurrency
+            return new Promise(function(resolve, reject) {
+              var activeCount = 0;
+
+              function startNext() {
+                while (activeCount < CONCURRENCY && nextIndex < totalFiles) {
+                  (function(idx) {
+                    activeCount++;
+                    var file = files[idx];
+                    // Add to in-flight list
+                    self._addInFlightFile(idx, file);
+
+                    var blob = new Nuxeo.Blob({ content: file });
+                    uploader.upload(blob, {
+                      onProgress: function(e) {
+                        self._updateS3FileProgress(idx, file, e, perFileLoaded);
+                      }
+                    }).then(function(res) {
+                      self._items.forEach(function(item) {
+                        if (!item.isFolder && item.fileIndex === idx) {
+                          item.batchFileIndex = res.blob.fileIdx;
+                        }
+                      });
+                      perFileLoaded[idx] = file.size;
+                      completedCount++;
+                      activeCount--;
+                      self._updateS3AggregateProgress(perFileLoaded, totalBytes, completedCount, totalFiles);
+                      self._removeInFlightFile(idx);
+                      if (completedCount === totalFiles) {
+                        resolve();
+                      } else {
+                        startNext();
+                      }
+                    }).catch(function(err) {
+                      reject(err);
+                    });
+                  })(nextIndex);
+                  nextIndex++;
+                }
+              }
+
+              if (nextIndex >= totalFiles) {
+                resolve();
+              } else {
+                startNext();
+              }
+            });
+          }).then(function() {
+            self._hasInFlightFiles = false;
+            self._inFlightFiles = [];
+            return batchId;
+          });
+        });
+      },
+
+      _addInFlightFile: function(idx, file) {
+        var list = this._inFlightFiles.slice();
+        list.push({
+          idx: idx,
+          name: file.name,
+          sizeLabel: this._formatSize(file.size),
+          pct: 0
+        });
+        this._inFlightFiles = list;
+      },
+
+      _removeInFlightFile: function(idx) {
+        this._inFlightFiles = this._inFlightFiles.filter(function(f) { return f.idx !== idx; });
+      },
+
+      _updateS3FileProgress: function(idx, file, progressEvent, perFileLoaded) {
+        if (progressEvent && progressEvent.loaded !== undefined) {
+          perFileLoaded[idx] = progressEvent.loaded;
+          var pct = file.size > 0 ? Math.round((progressEvent.loaded / file.size) * 100) : 100;
+
+          // Update in-flight entry
+          var list = this._inFlightFiles.slice();
+          for (var i = 0; i < list.length; i++) {
+            if (list[i].idx === idx) {
+              list[i] = Object.assign({}, list[i], { pct: pct });
+              break;
+            }
+          }
+          this._inFlightFiles = list;
+        }
+
+        // Update aggregate
+        var totalLoaded = 0;
+        for (var j = 0; j < perFileLoaded.length; j++) {
+          totalLoaded += perFileLoaded[j];
+        }
+        this._uploadedBytes = totalLoaded;
+        this._uploadProgressValue = totalLoaded;
+        this._uploadProgressLabel = this.i18n('folderDrop.progress.uploading.bytes',
+          this._formatSize(totalLoaded), this._formatSize(this._totalBytes));
+      },
+
+      _updateS3AggregateProgress: function(perFileLoaded, totalBytes, completedCount, totalFiles) {
+        var totalLoaded = 0;
+        for (var j = 0; j < perFileLoaded.length; j++) {
+          totalLoaded += perFileLoaded[j];
+        }
+        this._uploadedBytes = totalLoaded;
+        this._uploadProgressValue = totalLoaded;
+        this._uploadProgressLabel = this.i18n('folderDrop.progress.uploading.bytes',
+          this._formatSize(totalLoaded), this._formatSize(totalBytes));
+      },
+
+      /**
+       * Calls FolderDrop.ResolveTypes to get doc types for all items.
+       * Returns { resolvedItems, batchId, hadCallback }.
+       */
+      _resolveTypes: function(batchId) {
+        var self = this;
+
+        // Build the tree JSON (strip fileIndex, keep batchFileIndex)
+        var treeItems = this._items.map(function(item) {
+          var obj = {
+            name: item.name,
+            relativePath: item.relativePath,
+            isFolder: item.isFolder,
+            mimeType: item.mimeType || '',
+            size: item.size || 0
+          };
+          if (!item.isFolder && item.batchFileIndex !== undefined) {
+            obj.batchFileIndex = item.batchFileIndex;
+          }
+          return obj;
+        });
+
+        // Show resolving spinner (indeterminate) — will only be meaningful with a callback chain,
+        // but we always call the operation (it's fast without a chain)
+        this._showResolvingProgress = true;
+
+        var op = this.$.resolveTypesOp;
+        op.params = { parentPath: this.document.path };
+        op.input = new Blob([JSON.stringify(treeItems)], { type: 'application/json' });
+
+        return op.execute().then(function(response) {
+          if (response && typeof response.text === 'function') {
+            return response.text();
+          }
+          return typeof response === 'string' ? response : JSON.stringify(response);
+        }).then(function(text) {
+          var resolvedItems = JSON.parse(text);
+          // Determine if callback was used: if any file has a non-null docType, a callback was involved
+          var hadCallback = resolvedItems.some(function(item) {
+            return !item.isFolder && item.docType !== null && item.docType !== undefined;
+          });
+          return { resolvedItems: resolvedItems, batchId: batchId, hadCallback: hadCallback };
+        });
+      },
+
+      /**
+       * Creates folder documents top-down.
+       */
+      _createFolders: function(resolvedItems, batchId) {
+        var self = this;
+        var folders = resolvedItems.filter(function(item) { return item.isFolder; });
+        var files = resolvedItems.filter(function(item) { return !item.isFolder; });
+        var totalDocs = folders.length + files.length;
+
+        // Sort by depth (top-down)
+        folders.sort(function(a, b) {
+          return a.relativePath.split('/').length - b.relativePath.split('/').length;
+        });
+
+        this._showImportProgress = true;
+        this._importProgressValue = 0;
+        this._importProgressMax = totalDocs;
+        this._importProgressLabel = this.i18n('folderDrop.progress.creatingDocs.count',
+          '0', totalDocs.toString());
+
+        var parentPath = this.document.path;
+        var created = 0;
+
+        // Create folders sequentially (parent must exist before child)
+        var chain = Promise.resolve();
+        folders.forEach(function(folder) {
+          chain = chain.then(function() {
+            var folderParentPath = self._getParentNuxeoPath(parentPath, folder.relativePath);
+            var docType = folder.docType || 'Folder';
+            var name = folder.name;
+
+            return self.$.nx.connect().then(function(client) {
+              return client.request('/path' + folderParentPath)
+                .post({
+                  body: {
+                    'entity-type': 'document',
+                    type: docType,
+                    name: name,
+                    properties: {
+                      'dc:title': name
+                    }
+                  }
+                });
+            }).then(function() {
+              created++;
+              self._importProgressValue = created;
+              self._importProgressLabel = self.i18n('folderDrop.progress.creatingDocs.count',
+                created.toString(), totalDocs.toString());
+            });
+          });
+        });
+
+        return chain.then(function() {
+          return { resolvedItems: resolvedItems, batchId: batchId, created: created, totalDocs: totalDocs };
+        });
+      },
+
+      /**
+       * Imports files. If docType is null, uses FileManager.Import.
+       * Otherwise creates explicitly with the given type.
+       */
+      _importFiles: function(resolvedItems, batchId) {
+        var self = this;
+        var files = resolvedItems.filter(function(item) { return !item.isFolder; });
+        var folders = resolvedItems.filter(function(item) { return item.isFolder; });
+        var totalDocs = folders.length + files.length;
+
+        if (files.length === 0 || !batchId) {
+          return Promise.resolve();
+        }
+
+        var created = folders.length; // folders already done
+        var parentPath = this.document.path;
+
+        // Import files sequentially
+        var chain = Promise.resolve();
+        files.forEach(function(file) {
+          chain = chain.then(function() {
+            var fileParentPath = self._getParentNuxeoPath(parentPath, file.relativePath);
+            var fileIdx = file.batchFileIndex !== undefined ? file.batchFileIndex : '0';
+
+            var promise;
+            if (file.docType) {
+              // Explicit creation with specified doc type
+              promise = self.$.nx.connect().then(function(client) {
+                return client.request('/path' + fileParentPath)
+                  .post({
+                    body: {
+                      'entity-type': 'document',
+                      type: file.docType,
+                      name: file.name,
+                      properties: {
+                        'dc:title': file.name,
+                        'file:content': {
+                          'upload-batch': batchId,
+                          'upload-fileId': String(fileIdx)
+                        }
+                      }
+                    },
+                    headers: {
+                      'X-Batch-No-Drop': 'true'
+                    }
+                  });
+              });
+            } else {
+              // Use FileManager.Import (default)
+              promise = self.$.nx.connect().then(function(client) {
+                return client.request('/upload/' + batchId + '/' + fileIdx + '/execute/FileManager.Import')
+                  .post({
+                    body: {
+                      params: {
+                        currentDocument: fileParentPath
+                      }
+                    },
+                    headers: {
+                      'X-Batch-No-Drop': 'true'
+                    }
+                  });
+              });
+            }
+
+            return promise.then(function() {
+              created++;
+              self._importProgressValue = created;
+              self._importProgressLabel = self.i18n('folderDrop.progress.creatingDocs.count',
+                created.toString(), totalDocs.toString());
+            });
+          });
+        });
+
+        return chain;
+      },
+
+      /**
+       * Given the base Nuxeo path and a relativePath like "folder1/subfolder/file.txt",
+       * returns the parent Nuxeo path, e.g., /base/path/folder1/subfolder
+       */
+      _getParentNuxeoPath: function(basePath, relativePath) {
+        var parts = relativePath.split('/');
+        // Remove the last part (the item name itself)
+        parts.pop();
+        if (parts.length === 0) {
+          return basePath;
+        }
+        return basePath + '/' + parts.join('/');
+      }
+    });
+  </script>
+</dom-module>
