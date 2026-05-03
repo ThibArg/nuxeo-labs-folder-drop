@@ -127,17 +127,33 @@ The chain **must set** the context variable `FolderDrop_Result` to a JSON string
 ### Example Chain (Automation Scripting)
 
 ```javascript
+// input is the main parent (where the user is currently drag-dropping)
 function run(input, params) {
   var result = {};
+  var isDroppingInCustomDocType = input.type === "MyCustomWorkspace";
+  var mime = params.mimeType || "";
+  var isImage = mime.indexOf("image/") === 0;
 
   if (params.isFolder) {
-    result.docType = "Workspace";
-  } else {
-    var mime = params.mimeType || "";
-    if (mime.indexOf("image/") === 0) {
-      result.docType = "Picture";
+    if(isDroppingInCustomDocType) {
+      result.docType = "MyCustomFolder";
     } else {
-      result.docType = "File";
+      result.docType = "Workspace";
+    }
+  } else {
+    
+    if(isDroppingInCustomDocType) {
+      if (isImage) {
+        result.docType = "MyCustomPictureDoc";
+      } else {
+        result.docType = ""MyCustomFileDoc";
+      }
+    } else {
+      if (isImage) {
+        result.docType = "Picture";
+      } else {
+        result.docType = "File";
+      }
     }
   }
 
