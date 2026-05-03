@@ -482,6 +482,9 @@ Contributors:
       },
 
       _openDialog: function() {
+        if (this._uploading) {
+          return;
+        }
         this._reset();
         this._validateConfig();
         this.$.dialog.open();
