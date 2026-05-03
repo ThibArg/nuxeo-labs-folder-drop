@@ -265,19 +265,15 @@ Contributors:
 
       <!-- Buttons -->
       <div class="buttons">
-        <!-- Before upload or after completion: Cancel / Close -->
-        <template is="dom-if" if="[[!_uploading]]">
-          <paper-button dialog-dismiss on-tap="_close">
-            [[_closeButtonLabel]]
-          </paper-button>
-        </template>
+        <!-- Cancel / Close -->
+        <paper-button dialog-dismiss on-tap="_close" disabled="[[_uploading]]">
+          [[_closeButtonLabel]]
+        </paper-button>
 
-        <!-- Upload button: visible after drop, before upload starts -->
-        <template is="dom-if" if="[[_canUpload]]">
-          <paper-button class="primary" on-tap="_startUpload">
-            [[i18n('folderDrop.dialog.upload')]]
-          </paper-button>
-        </template>
+        <!-- Upload button -->
+        <paper-button class="primary" on-tap="_startUpload" disabled="[[!_canUpload]]" hidden="[[!_hasTree]]">
+          [[i18n('folderDrop.dialog.upload')]]
+        </paper-button>
       </div>
     </nuxeo-dialog>
   </template>
