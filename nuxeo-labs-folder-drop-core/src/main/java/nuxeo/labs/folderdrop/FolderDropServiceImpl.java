@@ -76,10 +76,21 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
         return descriptor != null ? descriptor.getCallbackChain() : null;
     }
 
+    private static final int MAX_ITEMS = 10000;
+
     @Override
     public String resolveTypes(CoreSession session, String treeJson, String parentPath) {
         try {
-            ArrayNode items = (ArrayNode) OBJECT_MAPPER.readTree(treeJson);
+            JsonNode parsed = OBJECT_MAPPER.readTree(treeJson);
+            if (!(parsed instanceof ArrayNode)) {
+                throw new NuxeoException("Invalid tree JSON: expected a JSON array");
+            }
+            ArrayNode items = (ArrayNode) parsed;
+
+            if (items.size() > MAX_ITEMS) {
+                throw new NuxeoException(
+                        "Too many items in tree (" + items.size() + "). Maximum allowed is " + MAX_ITEMS);
+            }
 
             if (!hasCallbackChain()) {
                 return resolveDefaults(items);
@@ -95,7 +106,11 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
      * Default resolution: folders → "Folder", files → null (FileManager.Import).
      */
     protected String resolveDefaults(ArrayNode items) {
-        for (JsonNode item : items) {
+        for (int i = 0; i < items.size(); i++) {
+            JsonNode item = items.get(i);
+            if (!(item instanceof ObjectNode)) {
+                throw new NuxeoException("Invalid tree item at index " + i + ": expected a JSON object");
+            }
             ObjectNode obj = (ObjectNode) item;
             boolean isFolder = obj.path("isFolder").asBoolean(false);
             if (isFolder) {
@@ -118,7 +133,11 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
         AutomationService automationService = Framework.getService(AutomationService.class);
         DocumentModel parentDoc = session.getDocument(new PathRef(parentPath));
 
-        for (JsonNode item : items) {
+        for (int i = 0; i < items.size(); i++) {
+            JsonNode item = items.get(i);
+            if (!(item instanceof ObjectNode)) {
+                throw new NuxeoException("Invalid tree item at index " + i + ": expected a JSON object");
+            }
             ObjectNode obj = (ObjectNode) item;
             String name = obj.path("name").asText("");
             boolean isFolder = obj.path("isFolder").asBoolean(false);

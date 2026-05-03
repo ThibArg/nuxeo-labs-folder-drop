@@ -542,6 +542,8 @@ Contributors:
         this._configValid = true;
         this._maxFiles = 500;
         this._maxTotalSizeInBytes = 2147483648;
+        this._uploader = null;
+        this._batchId = null;
       },
 
       _close: function() {
@@ -635,7 +637,8 @@ Contributors:
 
           self._canUpload = true;
         }).catch(function(err) {
-          self._errorMessage = self.i18n('folderDrop.error.readFailed') + ': ' + err.message;
+          console.error('[nuxeo-labs-folder-drop] Failed to read folder contents:', err);
+          self._errorMessage = self.i18n('folderDrop.error.readFailed');
         });
       },
 
@@ -650,6 +653,11 @@ Contributors:
 
         function readEntry(entry, parentPath) {
           return new Promise(function(resolve, reject) {
+            // Reject entry names containing path traversal sequences
+            if (entry.name.indexOf('..') !== -1 || entry.name.indexOf('/') !== -1 || entry.name.indexOf('\\') !== -1) {
+              reject(new Error('Invalid entry name: ' + entry.name));
+              return;
+            }
             var relativePath = parentPath ? parentPath + '/' + entry.name : entry.name;
 
             if (entry.isFile) {
@@ -771,11 +779,13 @@ Contributors:
         this._canUpload = false;
         this._uploading = true;
         this._errorMessage = '';
+        this._batchId = null;
 
         var self = this;
 
         // Step 1: Upload all files to a batch
         this._uploadFiles().then(function(batchId) {
+          self._batchId = batchId;
           self._showUploadProgress = false;
           self._uploadDone = true;
 
@@ -797,11 +807,29 @@ Contributors:
           self._uploading = false;
           self._successMessage = self.i18n('folderDrop.success');
         }).catch(function(err) {
+          console.error('[nuxeo-labs-folder-drop] Import failed:', err);
           self._showUploadProgress = false;
           self._showResolvingProgress = false;
           self._showImportProgress = false;
           self._uploading = false;
-          self._errorMessage = self.i18n('folderDrop.error.importFailed') + ': ' + (err.message || err);
+          self._errorMessage = self.i18n('folderDrop.error.importFailed');
+          // Clean up the batch if it was created
+          if (self._batchId) {
+            self._deleteBatch(self._batchId);
+          }
+        });
+      },
+
+      /**
+       * Deletes a batch to clean up uploaded files on error.
+       */
+      _deleteBatch: function(batchId) {
+        this.$.nx.connect().then(function(client) {
+          client.request('/upload/' + batchId)
+            .delete()
+            .catch(function(e) {
+              console.warn('[nuxeo-labs-folder-drop] Failed to clean up batch:', e);
+            });
         });
       },
 
