@@ -2,6 +2,9 @@
 
 > **Note:** This is Work In Progress - Not ready for use
 
+> [!IMPORTANT]
+> This plugin is not for mass import. See [Scope and Use Cases](#scope-and-use-cases).
+
 ## Description
 
 A Nuxeo LTS 2025 plugin that adds **drag-and-drop folder import** to [Nuxeo Web UI](https://doc.nuxeo.com/nxdoc/web-ui/), preserving the folder hierarchy. Users can drop one or more folders from their desktop (Mac, Windows) and the plugin creates the corresponding Nuxeo documents — folders and files — mirroring the original structure.
@@ -70,6 +73,14 @@ org.nuxeo.web.ui.folderDrop.maxTotalSizeInBytes=5368709120
 ```
 
 These properties can also be overridden via an XML contribution to `org.nuxeo.runtime.ConfigurationService`.
+
+## Scope and Use Cases
+
+This plugin is designed for **end-user convenience**, not for bulk or mass import. For large-scale data migration or automated ingestion, refer to the Nuxeo documentation on [choosing how to import data](https://doc.nuxeo.com/nxdoc/choosing-how-to-import-data-in-the-nuxeo-platform/).
+
+The typical use case is a user dropping a folder containing some dozens of files, with or without a folder hierarchy. The plugin implements guardrails to prevent overloading the server — see [Configuration](#configuration) for the maximum file count and total size settings.
+
+When users upload large files (more than a few dozen MB each), Nuxeo timeout configuration parameters may need to be tuned (e.g., transaction timeout, reverse proxy timeouts) to avoid interruptions during the upload or document creation phases.
 
 ## Default Behavior
 
