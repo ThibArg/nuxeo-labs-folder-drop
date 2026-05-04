@@ -146,7 +146,7 @@ function run(input, params) {
       if (isImage) {
         result.docType = "MyCustomPictureDoc";
       } else {
-        result.docType = ""MyCustomFileDoc";
+        result.docType = "MyCustomFileDoc";
       }
     } else {
       if (isImage) {
