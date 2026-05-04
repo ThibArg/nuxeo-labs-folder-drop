@@ -278,8 +278,18 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
                     setDefaultDocType(obj, isFolder);
                 }
             } catch (OperationException | IOException e) {
-                log.warn("Callback chain '{}' failed for item '{}', using default", chainId, name, e);
-                setDefaultDocType(obj, isFolder);
+                var rootMessage = e.getMessage();
+                var cause = e.getCause();
+                while (cause != null) {
+                    if (cause.getMessage() != null) {
+                        rootMessage = cause.getMessage();
+                    }
+                    cause = cause.getCause();
+                }
+                throw new NuxeoException(
+                        "Callback chain '%s' failed for item '%s': %s".formatted(chainId, relativePath,
+                                rootMessage),
+                        e);
             }
         }
 

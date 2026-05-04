@@ -334,4 +334,20 @@ public class TestFolderDropService {
         assertEquals("partial", event.get("status"));
         assertEquals(5, event.get("createdCount"));
     }
+
+    // ==================== Callback Chain Error Propagation Tests ====================
+
+    @Test
+    @Deploy("nuxeo.labs.folderdrop.nuxeo-labs-folder-drop-core:test-callback-error.xml")
+    public void testCallbackChainErrorPropagates() {
+        assertTrue(service.hasCallbackChain());
+        try {
+            service.resolveTypes(session, TREE_JSON, testFolder.getPathAsString());
+            fail("Expected NuxeoException from failing callback chain");
+        } catch (NuxeoException e) {
+            assertTrue(e.getMessage().contains("Callback chain"));
+            assertTrue(e.getMessage().contains("failed for item"));
+            assertTrue(e.getMessage().contains("Custom validation error"));
+        }
+    }
 }
