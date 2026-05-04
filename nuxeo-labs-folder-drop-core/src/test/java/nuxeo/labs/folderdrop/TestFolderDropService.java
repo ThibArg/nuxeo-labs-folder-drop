@@ -21,9 +21,11 @@ package nuxeo.labs.folderdrop;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+
+import java.io.IOException;
+import java.util.HashMap;
 
 import jakarta.inject.Inject;
 
@@ -42,13 +44,8 @@ import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.Features;
 import org.nuxeo.runtime.test.runner.FeaturesRunner;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 @RunWith(FeaturesRunner.class)
 @Features({ PlatformFeature.class })
@@ -69,20 +66,20 @@ public class TestFolderDropService {
             + "{\"name\":\"folder2\",\"relativePath\":\"folder2\",\"isFolder\":true,\"mimeType\":\"\",\"size\":0}"
             + "]";
 
-    /** Tree containing a video file (denied by test-deny-patterns.xml) */
+    /** Tree containing a video file (denied by test-deny-patterns.xml). */
     private static final String TREE_WITH_VIDEO = "["
             + "{\"name\":\"folder1\",\"relativePath\":\"folder1\",\"isFolder\":true,\"mimeType\":\"\",\"size\":0},"
             + "{\"name\":\"movie.mp4\",\"relativePath\":\"folder1/movie.mp4\",\"isFolder\":false,\"mimeType\":\"video/mp4\",\"size\":99999,\"batchFileIndex\":0}"
             + "]";
 
-    /** Tree containing a hidden file */
+    /** Tree containing a hidden file. */
     private static final String TREE_WITH_HIDDEN = "["
             + "{\"name\":\"folder1\",\"relativePath\":\"folder1\",\"isFolder\":true,\"mimeType\":\"\",\"size\":0},"
             + "{\"name\":\".DS_Store\",\"relativePath\":\"folder1/.DS_Store\",\"isFolder\":false,\"mimeType\":\"application/octet-stream\",\"size\":100,\"batchFileIndex\":0},"
             + "{\"name\":\"file1.pdf\",\"relativePath\":\"folder1/file1.pdf\",\"isFolder\":false,\"mimeType\":\"application/pdf\",\"size\":12345,\"batchFileIndex\":1}"
             + "]";
 
-    /** Tree with only clean files (no denied content) */
+    /** Tree with only clean files (no denied content). */
     private static final String TREE_CLEAN = "["
             + "{\"name\":\"folder1\",\"relativePath\":\"folder1\",\"isFolder\":true,\"mimeType\":\"\",\"size\":0},"
             + "{\"name\":\"file1.pdf\",\"relativePath\":\"folder1/file1.pdf\",\"isFolder\":false,\"mimeType\":\"application/pdf\",\"size\":12345,\"batchFileIndex\":0}"
@@ -118,28 +115,28 @@ public class TestFolderDropService {
 
     @Test
     public void testResolveTypesNoCallback() throws IOException {
-        String result = service.resolveTypes(session, TREE_JSON, testFolder.getPathAsString());
+        var result = service.resolveTypes(session, TREE_JSON, testFolder.getPathAsString());
         assertNotNull(result);
 
-        ArrayNode items = (ArrayNode) MAPPER.readTree(result);
+        var items = (ArrayNode) MAPPER.readTree(result);
         assertEquals(6, items.size());
 
-        // folder1 → "Folder"
+        // folder1 -> "Folder"
         assertEquals("Folder", items.get(0).get("docType").asText());
 
-        // file1.pdf → null (FileManager.Import)
+        // file1.pdf -> null (FileManager.Import)
         assertTrue(items.get(1).get("docType").isNull());
 
-        // image.png → null
+        // image.png -> null
         assertTrue(items.get(2).get("docType").isNull());
 
-        // subfolder → "Folder"
+        // subfolder -> "Folder"
         assertEquals("Folder", items.get(3).get("docType").asText());
 
-        // doc.txt → null
+        // doc.txt -> null
         assertTrue(items.get(4).get("docType").isNull());
 
-        // folder2 → "Folder"
+        // folder2 -> "Folder"
         assertEquals("Folder", items.get(5).get("docType").asText());
     }
 
@@ -149,43 +146,43 @@ public class TestFolderDropService {
         assertTrue(service.hasCallbackChain());
         assertEquals("javascript.testFolderDropCallback", service.getCallbackChain());
 
-        String result = service.resolveTypes(session, TREE_JSON, testFolder.getPathAsString());
+        var result = service.resolveTypes(session, TREE_JSON, testFolder.getPathAsString());
         assertNotNull(result);
 
-        ArrayNode items = (ArrayNode) MAPPER.readTree(result);
+        var items = (ArrayNode) MAPPER.readTree(result);
         assertEquals(6, items.size());
 
-        // folder1 → "Workspace" (the test chain returns Workspace for folders)
+        // folder1 -> "Workspace" (the test chain returns Workspace for folders)
         assertEquals("Workspace", items.get(0).get("docType").asText());
 
-        // file1.pdf → "File" (the test chain returns File for application/*)
+        // file1.pdf -> "File" (the test chain returns File for application/*)
         assertEquals("File", items.get(1).get("docType").asText());
 
-        // image.png → "Picture" (the test chain returns Picture for image/*)
+        // image.png -> "Picture" (the test chain returns Picture for image/*)
         assertEquals("Picture", items.get(2).get("docType").asText());
 
-        // subfolder → "Workspace"
+        // subfolder -> "Workspace"
         assertEquals("Workspace", items.get(3).get("docType").asText());
 
-        // doc.txt → "Note" (the test chain returns Note for text/*)
+        // doc.txt -> "Note" (the test chain returns Note for text/*)
         assertEquals("Note", items.get(4).get("docType").asText());
 
-        // folder2 → "Workspace"
+        // folder2 -> "Workspace"
         assertEquals("Workspace", items.get(5).get("docType").asText());
     }
 
     @Test
     @Deploy("nuxeo.labs.folderdrop.nuxeo-labs-folder-drop-core:test-callback-chain.xml")
     public void testResolveTypesOperation() throws OperationException, IOException {
-        try (OperationContext ctx = new OperationContext(session)) {
-            Map<String, Object> params = new HashMap<>();
+        try (var ctx = new OperationContext(session)) {
+            var params = new HashMap<String, Object>();
             params.put("parentPath", testFolder.getPathAsString());
             params.put("treeJson", TREE_JSON);
 
-            Blob result = (Blob) automationService.run(ctx, FolderDropResolveTypesOp.ID, params);
+            var result = (Blob) automationService.run(ctx, FolderDropResolveTypesOp.ID, params);
             assertNotNull(result);
 
-            ArrayNode items = (ArrayNode) MAPPER.readTree(result.getString());
+            var items = (ArrayNode) MAPPER.readTree(result.getString());
             assertEquals(6, items.size());
             assertEquals("Workspace", items.get(0).get("docType").asText());
             assertEquals("Picture", items.get(2).get("docType").asText());
@@ -195,19 +192,19 @@ public class TestFolderDropService {
     @Test
     @Deploy("nuxeo.labs.folderdrop.nuxeo-labs-folder-drop-core:test-callback-partial.xml")
     public void testResolveTypesCallbackReturnsPartial() throws IOException {
-        // This chain only sets docType for folders, leaves files with no result → defaults
-        String result = service.resolveTypes(session, TREE_JSON, testFolder.getPathAsString());
+        // This chain only sets docType for folders, leaves files with no result -> defaults
+        var result = service.resolveTypes(session, TREE_JSON, testFolder.getPathAsString());
         assertNotNull(result);
 
-        ArrayNode items = (ArrayNode) MAPPER.readTree(result);
+        var items = (ArrayNode) MAPPER.readTree(result);
 
-        // folder1 → "OrderedFolder" (set by chain)
+        // folder1 -> "OrderedFolder" (set by chain)
         assertEquals("OrderedFolder", items.get(0).get("docType").asText());
 
-        // file1.pdf → default "Folder" fallback won't apply; isFolder=false → null
+        // file1.pdf -> default "Folder" fallback won't apply; isFolder=false -> null
         assertTrue(items.get(1).get("docType").isNull());
 
-        // subfolder → "OrderedFolder"
+        // subfolder -> "OrderedFolder"
         assertEquals("OrderedFolder", items.get(3).get("docType").asText());
     }
 
@@ -231,9 +228,9 @@ public class TestFolderDropService {
     @Deploy("nuxeo.labs.folderdrop.nuxeo-labs-folder-drop-core:test-deny-patterns.xml")
     public void testDenyPatternAllowsCleanFiles() throws IOException {
         // application/pdf should not be denied by video/.* or application/x-executable
-        String result = service.resolveTypes(session, TREE_CLEAN, testFolder.getPathAsString());
+        var result = service.resolveTypes(session, TREE_CLEAN, testFolder.getPathAsString());
         assertNotNull(result);
-        ArrayNode items = (ArrayNode) MAPPER.readTree(result);
+        var items = (ArrayNode) MAPPER.readTree(result);
         assertEquals(2, items.size());
     }
 
@@ -255,9 +252,9 @@ public class TestFolderDropService {
     public void testHiddenFileAllowedWhenDisabled() throws IOException {
         assertFalse(service.isFilterHiddenFiles());
         // With filterHiddenFiles=false, hidden files should pass through
-        String result = service.resolveTypes(session, TREE_WITH_HIDDEN, testFolder.getPathAsString());
+        var result = service.resolveTypes(session, TREE_WITH_HIDDEN, testFolder.getPathAsString());
         assertNotNull(result);
-        ArrayNode items = (ArrayNode) MAPPER.readTree(result);
+        var items = (ArrayNode) MAPPER.readTree(result);
         assertEquals(3, items.size());
     }
 

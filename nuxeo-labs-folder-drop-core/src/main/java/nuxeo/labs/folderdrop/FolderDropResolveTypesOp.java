@@ -38,6 +38,11 @@ import org.nuxeo.runtime.api.Framework;
  * <p>
  * If a callback chain is configured, it is called for each item to determine
  * the document type.
+ * <p>
+ * This FolderDrop.ResolveTypes operation is mainly an internal operation. Developers
+ * can still override it if they need to tune the behavior without changing the whole
+ * plugin. Just create an operation of the same ID and make sure to deploy it after
+ * this one (the best place is an operation in a Nuxeo Studio project)
  *
  * @since 2025.1
  */
@@ -57,8 +62,8 @@ public class FolderDropResolveTypesOp {
 
     @OperationMethod
     public Blob run() {
-        FolderDropService service = Framework.getService(FolderDropService.class);
-        String result = service.resolveTypes(session, treeJson, parentPath);
+        var service = Framework.getService(FolderDropService.class);
+        var result = service.resolveTypes(session, treeJson, parentPath);
         return Blobs.createJSONBlob(result);
     }
 }

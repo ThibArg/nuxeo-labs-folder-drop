@@ -34,7 +34,6 @@ import org.nuxeo.ecm.automation.AutomationService;
 import org.nuxeo.ecm.automation.OperationContext;
 import org.nuxeo.ecm.automation.OperationException;
 import org.nuxeo.ecm.core.api.CoreSession;
-import org.nuxeo.ecm.core.api.DocumentModel;
 import org.nuxeo.ecm.core.api.NuxeoException;
 import org.nuxeo.ecm.core.api.PathRef;
 import org.nuxeo.runtime.api.Framework;
@@ -60,7 +59,9 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
 
     public static final String EXT_POINT = "configuration";
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    protected static final int MAX_ITEMS = 10000;
 
     protected FolderDropDescriptor descriptor;
 
@@ -77,18 +78,18 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
             // Parse and validate deny patterns at startup
             compiledDenyPatterns = new ArrayList<>();
             denyPatternStrings = new ArrayList<>();
-            String rawPatterns = descriptor.getMimeTypeDenyPatterns();
+            var rawPatterns = descriptor.getMimeTypeDenyPatterns();
             if (StringUtils.isNotBlank(rawPatterns)) {
-                String[] parts = rawPatterns.split(",");
-                for (String part : parts) {
-                    String trimmed = part.trim();
+                var parts = rawPatterns.split(",");
+                for (var part : parts) {
+                    var trimmed = part.trim();
                     if (StringUtils.isNotBlank(trimmed)) {
                         try {
                             compiledDenyPatterns.add(Pattern.compile(trimmed));
                             denyPatternStrings.add(trimmed);
                         } catch (PatternSyntaxException e) {
                             throw new NuxeoException(
-                                    "Invalid MIME type deny pattern '" + trimmed + "': " + e.getMessage(), e);
+                                    "Invalid MIME type deny pattern '%s': %s".formatted(trimmed, e.getMessage()), e);
                         }
                     }
                 }
@@ -124,33 +125,32 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
         if (StringUtils.isBlank(mimeType) || compiledDenyPatterns == null || compiledDenyPatterns.isEmpty()) {
             return false;
         }
-        for (Pattern pattern : compiledDenyPatterns) {
+        for (var pattern : compiledDenyPatterns) {
             try {
                 if (pattern.matcher(mimeType).matches()) {
                     return true;
                 }
             } catch (Exception e) {
-                throw new NuxeoException("Error evaluating MIME type deny pattern '" + pattern.pattern()
-                        + "' against MIME type '" + mimeType + "'", e);
+                throw new NuxeoException(
+                        "Error evaluating MIME type deny pattern '%s' against MIME type '%s'".formatted(
+                                pattern.pattern(), mimeType),
+                        e);
             }
         }
         return false;
     }
 
-    private static final int MAX_ITEMS = 10000;
-
     @Override
     public String resolveTypes(CoreSession session, String treeJson, String parentPath) {
         try {
-            JsonNode parsed = OBJECT_MAPPER.readTree(treeJson);
-            if (!(parsed instanceof ArrayNode)) {
+            var parsed = OBJECT_MAPPER.readTree(treeJson);
+            if (!(parsed instanceof ArrayNode items)) {
                 throw new NuxeoException("Invalid tree JSON: expected a JSON array");
             }
-            ArrayNode items = (ArrayNode) parsed;
 
             if (items.size() > MAX_ITEMS) {
                 throw new NuxeoException(
-                        "Too many items in tree (" + items.size() + "). Maximum allowed is " + MAX_ITEMS);
+                        "Too many items in tree (%d). Maximum allowed is %d".formatted(items.size(), MAX_ITEMS));
             }
 
             // Validate items against file filters before resolving types
@@ -168,33 +168,33 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
 
     /**
      * Validates all items against configured file filters.
+     * <p>
      * Throws a NuxeoException if any denied items are found, listing them with reasons.
      * Items that reach the server despite being denied should have been filtered client-side,
      * which may indicate client-side tampering.
      */
     protected void validateFilters(ArrayNode items) {
-        boolean filterHidden = isFilterHiddenFiles();
-        boolean hasDenyPatterns = compiledDenyPatterns != null && !compiledDenyPatterns.isEmpty();
+        var filterHidden = isFilterHiddenFiles();
+        var hasDenyPatterns = compiledDenyPatterns != null && !compiledDenyPatterns.isEmpty();
 
         if (!filterHidden && !hasDenyPatterns) {
             return;
         }
 
-        List<String> rejectedItems = new ArrayList<>();
+        var rejectedItems = new ArrayList<String>();
 
         for (int i = 0; i < items.size(); i++) {
-            JsonNode item = items.get(i);
-            if (!(item instanceof ObjectNode)) {
+            var item = items.get(i);
+            if (!(item instanceof ObjectNode obj)) {
                 continue;
             }
-            ObjectNode obj = (ObjectNode) item;
-            String name = obj.path("name").asText("");
-            boolean isFolder = obj.path("isFolder").asBoolean(false);
-            String mimeType = obj.path("mimeType").asText("");
-            String relativePath = obj.path("relativePath").asText(name);
+            var name = obj.path("name").asText("");
+            var isFolder = obj.path("isFolder").asBoolean(false);
+            var mimeType = obj.path("mimeType").asText("");
+            var relativePath = obj.path("relativePath").asText(name);
 
             // Check hidden files/folders
-            if (filterHidden && name.length() > 0 && name.charAt(0) == '.') {
+            if (filterHidden && !name.isEmpty() && name.charAt(0) == '.') {
                 rejectedItems.add(relativePath + " (hidden file/folder)");
                 continue;
             }
@@ -213,16 +213,15 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
     }
 
     /**
-     * Default resolution: folders -> "Folder", files -> null (FileManager.Import).
+     * Resolves types using defaults: folders get "Folder", files get null (FileManager.Import).
      */
     protected String resolveDefaults(ArrayNode items) {
         for (int i = 0; i < items.size(); i++) {
-            JsonNode item = items.get(i);
-            if (!(item instanceof ObjectNode)) {
-                throw new NuxeoException("Invalid tree item at index " + i + ": expected a JSON object");
+            var item = items.get(i);
+            if (!(item instanceof ObjectNode obj)) {
+                throw new NuxeoException("Invalid tree item at index %d: expected a JSON object".formatted(i));
             }
-            ObjectNode obj = (ObjectNode) item;
-            boolean isFolder = obj.path("isFolder").asBoolean(false);
+            var isFolder = obj.path("isFolder").asBoolean(false);
             if (isFolder) {
                 obj.put("docType", "Folder");
             } else {
@@ -233,29 +232,29 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
     }
 
     /**
-     * Resolve types by calling the configured automation chain for each item.
+     * Resolves types by calling the configured automation chain for each item.
+     * <p>
      * The chain receives the parent document as input and item properties as parameters.
      * It must set the context variable {@link #CALLBACK_RESULT_CTX_VAR} to a JSON string
      * like {@code {"docType": "MyType"}}.
      */
     protected String resolveWithCallback(CoreSession session, ArrayNode items, String parentPath) {
-        String chainId = descriptor.getCallbackChain();
-        AutomationService automationService = Framework.getService(AutomationService.class);
-        DocumentModel parentDoc = session.getDocument(new PathRef(parentPath));
+        var chainId = descriptor.getCallbackChain();
+        var automationService = Framework.getService(AutomationService.class);
+        var parentDoc = session.getDocument(new PathRef(parentPath));
 
         for (int i = 0; i < items.size(); i++) {
-            JsonNode item = items.get(i);
-            if (!(item instanceof ObjectNode)) {
-                throw new NuxeoException("Invalid tree item at index " + i + ": expected a JSON object");
+            var item = items.get(i);
+            if (!(item instanceof ObjectNode obj)) {
+                throw new NuxeoException("Invalid tree item at index %d: expected a JSON object".formatted(i));
             }
-            ObjectNode obj = (ObjectNode) item;
-            String name = obj.path("name").asText("");
-            boolean isFolder = obj.path("isFolder").asBoolean(false);
-            String mimeType = obj.path("mimeType").asText("");
-            long size = obj.path("size").asLong(0);
-            String relativePath = obj.path("relativePath").asText("");
+            var name = obj.path("name").asText("");
+            var isFolder = obj.path("isFolder").asBoolean(false);
+            var mimeType = obj.path("mimeType").asText("");
+            var size = obj.path("size").asLong(0);
+            var relativePath = obj.path("relativePath").asText("");
 
-            try (OperationContext ctx = new OperationContext(session)) {
+            try (var ctx = new OperationContext(session)) {
                 ctx.setInput(parentDoc);
                 Map<String, Object> params = new HashMap<>();
                 params.put(PARAM_NAME, name);
@@ -266,10 +265,10 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
 
                 automationService.run(ctx, chainId, params);
 
-                String resultStr = (String) ctx.get(CALLBACK_RESULT_CTX_VAR);
+                var resultStr = (String) ctx.get(CALLBACK_RESULT_CTX_VAR);
                 if (StringUtils.isNotBlank(resultStr)) {
-                    JsonNode resultJson = OBJECT_MAPPER.readTree(resultStr);
-                    JsonNode docTypeNode = resultJson.get("docType");
+                    var resultJson = OBJECT_MAPPER.readTree(resultStr);
+                    var docTypeNode = resultJson.get("docType");
                     if (docTypeNode != null && !docTypeNode.isNull()) {
                         obj.put("docType", docTypeNode.asText());
                     } else {
@@ -287,7 +286,7 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
         return items.toString();
     }
 
-    private void setDefaultDocType(ObjectNode obj, boolean isFolder) {
+    protected void setDefaultDocType(ObjectNode obj, boolean isFolder) {
         if (isFolder) {
             obj.put("docType", "Folder");
         } else {
