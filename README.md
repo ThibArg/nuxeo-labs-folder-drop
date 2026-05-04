@@ -66,6 +66,55 @@ This is a **warning only** — the Upload button remains enabled and the user ca
 
 Note: Only top-level items are checked. Sub-items (files and folders inside dropped folders) are created inside newly created folders, so there is no conflict with existing documents.
 
+## Customization
+
+### Overriding the Element
+
+The `nuxeo-labs-folder-drop.html` element can be overridden by placing a modified copy at the same path in your Nuxeo Studio project's custom bundle: `ui/nuxeo-labs-folder-drop/nuxeo-labs-folder-drop.html`. However, given the size and complexity of the element (~1,500 lines), this is **not recommended** unless you have a specific need and are comfortable maintaining your own fork.
+
+### Customizing the Action Button
+
+What is easy and recommended is to customize the **slot contribution** that controls where and when the button appears. Copy the default contribution:
+
+```html
+<nuxeo-slot-content name="folderDropAction" slot="DOCUMENT_ACTIONS" order="40">
+  <template>
+    <nuxeo-filter document="[[document]]" facet="Folderish">
+      <template>
+        <nuxeo-labs-folder-drop document="[[document]]"></nuxeo-labs-folder-drop>
+      </template>
+    </nuxeo-filter>
+  </template>
+</nuxeo-slot-content>
+```
+
+Paste it into your Studio project's custom bundle and adjust it to your needs.
+
+> [!IMPORTANT]
+> Do not change the `name="folderDropAction"` attribute. Nuxeo's slot system merges contributions by name — using the same name ensures your contribution **overrides** the default one. If you use a different name, both contributions will be active and the button will appear twice.
+
+**Examples:**
+
+Make the button appear first in the toolbar — change `order="40"` to `order="1"`:
+
+```html
+<nuxeo-slot-content name="folderDropAction" slot="DOCUMENT_ACTIONS" order="1">
+```
+
+Restrict to specific document types — replace the `facet` filter with a `type` filter:
+
+```html
+<nuxeo-filter document="[[document]]" type="SpecialFolder,SuperContainerDoc">
+```
+
+Restrict by permission — add a permission filter:
+
+```html
+<nuxeo-filter document="[[document]]" facet="Folderish" permission="Write">
+```
+
+You can combine multiple filters as needed. See the [Nuxeo Web UI Slots documentation](https://doc.nuxeo.com/nxdoc/web-ui-slots/) for all available filter options.
+
 ## Configuration
 
 The plugin enforces limits on the number of files and total size that can be uploaded in a single drop. These limits can be tuned in `nuxeo.conf` to match your deployment constraints (network speed, server capacity, Nuxeo cluster setup, etc.):
