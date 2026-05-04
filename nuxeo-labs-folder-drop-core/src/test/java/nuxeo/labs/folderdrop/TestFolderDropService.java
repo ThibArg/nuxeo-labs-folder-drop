@@ -35,7 +35,6 @@ import org.nuxeo.ecm.automation.OperationException;
 import org.nuxeo.ecm.core.api.Blob;
 import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.api.DocumentModel;
-import org.nuxeo.ecm.core.api.impl.blob.StringBlob;
 import org.nuxeo.ecm.platform.test.PlatformFeature;
 import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.Features;
@@ -157,12 +156,10 @@ public class TestFolderDropService {
     @Test
     @Deploy("nuxeo.labs.folderdrop.nuxeo-labs-folder-drop-core:test-callback-chain.xml")
     public void testResolveTypesOperation() throws OperationException, IOException {
-        Blob input = new StringBlob(TREE_JSON, "application/json");
-
         try (OperationContext ctx = new OperationContext(session)) {
-            ctx.setInput(input);
             Map<String, Object> params = new HashMap<>();
             params.put("parentPath", testFolder.getPathAsString());
+            params.put("treeJson", TREE_JSON);
 
             Blob result = (Blob) automationService.run(ctx, FolderDropResolveTypesOp.ID, params);
             assertNotNull(result);

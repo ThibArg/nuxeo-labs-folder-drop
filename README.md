@@ -178,8 +178,9 @@ If the chain does not set `FolderDrop_Result` for a specific item, the default a
 | | |
 |---|---|
 | **ID** | `FolderDrop.ResolveTypes` |
-| **Input** | `Blob` — JSON array describing the tree |
-| **Parameter** | `parentPath` (String, required) — path of the parent container |
+| **Input** | None |
+| **Parameters** | `parentPath` (String, required) — path of the parent container |
+| | `treeJson` (String, required) — JSON array describing the tree |
 | **Output** | `Blob` — same JSON array with `docType` populated |
 
 ### Extension Point: `configuration`

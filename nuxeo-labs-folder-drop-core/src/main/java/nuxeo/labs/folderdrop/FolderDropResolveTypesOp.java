@@ -18,23 +18,20 @@
  */
 package nuxeo.labs.folderdrop;
 
-import java.io.IOException;
-
 import org.nuxeo.ecm.automation.core.annotations.Context;
 import org.nuxeo.ecm.automation.core.annotations.Operation;
 import org.nuxeo.ecm.automation.core.annotations.OperationMethod;
 import org.nuxeo.ecm.automation.core.annotations.Param;
 import org.nuxeo.ecm.core.api.Blob;
 import org.nuxeo.ecm.core.api.CoreSession;
-import org.nuxeo.ecm.core.api.NuxeoException;
 import org.nuxeo.ecm.core.api.impl.blob.StringBlob;
 import org.nuxeo.runtime.api.Framework;
 
 /**
  * Automation operation that resolves document types for a folder tree.
  * <p>
- * Receives a JSON array describing the tree structure (folders and files)
- * and returns the same array with "docType" populated for each item.
+ * Receives a JSON array as a string parameter describing the tree structure
+ * (folders and files) and returns a JSON blob with "docType" populated for each item.
  * <p>
  * If no callback chain is configured, defaults are used:
  * folders → "Folder", files → null (FileManager.Import will be used).
@@ -44,7 +41,7 @@ import org.nuxeo.runtime.api.Framework;
  *
  * @since 2025.1
  */
-@Operation(id = FolderDropResolveTypesOp.ID, category = "Document", label = "FolderDrop: Resolve Types", description = "Resolves document types for a folder tree. Input is a JSON blob with the tree, output is the same tree with docType populated.")
+@Operation(id = FolderDropResolveTypesOp.ID, category = "Document", label = "FolderDrop: Resolve Types", description = "Resolves document types for a folder tree. Takes the tree JSON as a string parameter, returns the same tree with docType populated.")
 public class FolderDropResolveTypesOp {
 
     public static final String ID = "FolderDrop.ResolveTypes";
@@ -55,15 +52,12 @@ public class FolderDropResolveTypesOp {
     @Param(name = "parentPath", required = true, description = "Path of the parent container document")
     protected String parentPath;
 
+    @Param(name = "treeJson", required = true, description = "JSON array describing the tree structure")
+    protected String treeJson;
+
     @OperationMethod
-    public Blob run(Blob input) {
+    public Blob run() {
         FolderDropService service = Framework.getService(FolderDropService.class);
-        String treeJson;
-        try {
-            treeJson = input.getString();
-        } catch (IOException e) {
-            throw new NuxeoException("Failed to read input blob", e);
-        }
         String result = service.resolveTypes(session, treeJson, parentPath);
         return new StringBlob(result, "application/json");
     }

@@ -1109,8 +1109,11 @@ Contributors:
         this._showResolvingProgress = true;
 
         var op = this.$.resolveTypesOp;
-        op.params = { parentPath: this.document.path };
-        op.input = new Blob([JSON.stringify(treeItems)], { type: 'application/json' });
+        op.params = {
+          parentPath: this.document.path,
+          treeJson: JSON.stringify(treeItems)
+        };
+        op.input = undefined;
 
         return op.execute().then(function(response) {
           if (response && typeof response.text === 'function') {
