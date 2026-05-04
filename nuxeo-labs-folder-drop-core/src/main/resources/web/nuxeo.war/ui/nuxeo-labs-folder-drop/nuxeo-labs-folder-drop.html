@@ -860,7 +860,7 @@ Contributors:
           return self._createFolders(result.resolvedItems, result.batchId);
         }).then(function(result) {
           // Step 4: Import files
-          return self._importFiles(result.resolvedItems, result.batchId);
+          return self._importFiles(result.resolvedItems, result.batchId, result.pathToId);
         }).then(function() {
           self._showImportProgress = false;
           self._uploading = false;
@@ -1186,6 +1186,7 @@ Contributors:
 
       /**
        * Creates folder documents top-down.
+       * Maintains a map of relativePath -> document UUID for use by _importFiles.
        */
       _createFolders: function(resolvedItems, batchId) {
         var self = this;
@@ -1204,19 +1205,22 @@ Contributors:
         this._importProgressLabel = this.i18n('folderDrop.progress.creatingDocs.count',
           '0', totalDocs.toString());
 
-        var parentPath = this.document.path;
+        // Map relativePath -> UUID for parent lookups
+        var pathToId = {};
+        pathToId[''] = this.document.uid;
         var created = 0;
 
         // Create folders sequentially (parent must exist before child)
         var chain = Promise.resolve();
         folders.forEach(function(folder) {
           chain = chain.then(function() {
-            var folderParentPath = self._getParentNuxeoPath(parentPath, folder.relativePath);
+            var parentRelPath = self._getParentRelativePath(folder.relativePath);
+            var parentId = pathToId[parentRelPath];
             var docType = folder.docType || 'Folder';
             var name = folder.name;
 
             return self.$.nx.request().then(function(request) {
-              return request.path('/path' + folderParentPath)
+              return request.path('/id/' + parentId)
                 .post({
                   body: {
                     'entity-type': 'document',
@@ -1227,7 +1231,9 @@ Contributors:
                     }
                   }
                 });
-            }).then(function() {
+            }).then(function(response) {
+              // Store the UUID of the created folder for child lookups
+              pathToId[folder.relativePath] = response.uid;
               created++;
               self._importProgressValue = created;
               self._importProgressLabel = self.i18n('folderDrop.progress.creatingDocs.count',
@@ -1237,15 +1243,16 @@ Contributors:
         });
 
         return chain.then(function() {
-          return { resolvedItems: resolvedItems, batchId: batchId, created: created, totalDocs: totalDocs };
+          return { resolvedItems: resolvedItems, batchId: batchId, created: created, totalDocs: totalDocs, pathToId: pathToId };
         });
       },
 
       /**
        * Imports files. If docType is null, uses FileManager.Import.
        * Otherwise creates explicitly with the given type.
+       * Uses pathToId map to look up parent document UUIDs.
        */
-      _importFiles: function(resolvedItems, batchId) {
+      _importFiles: function(resolvedItems, batchId, pathToId) {
         var self = this;
         var files = resolvedItems.filter(function(item) { return !item.isFolder; });
         var folders = resolvedItems.filter(function(item) { return item.isFolder; });
@@ -1256,20 +1263,20 @@ Contributors:
         }
 
         var created = folders.length; // folders already done
-        var parentPath = this.document.path;
 
         // Import files sequentially
         var chain = Promise.resolve();
         files.forEach(function(file) {
           chain = chain.then(function() {
-            var fileParentPath = self._getParentNuxeoPath(parentPath, file.relativePath);
+            var parentRelPath = self._getParentRelativePath(file.relativePath);
+            var parentId = pathToId[parentRelPath];
             var fileIdx = file.batchFileIndex !== undefined ? file.batchFileIndex : '0';
 
             var promise;
             if (file.docType) {
               // Explicit creation with specified doc type
               promise = self.$.nx.request().then(function(request) {
-                return request.path('/path' + fileParentPath)
+                return request.path('/id/' + parentId)
                   .post({
                     body: {
                       'entity-type': 'document',
@@ -1289,18 +1296,18 @@ Contributors:
                   });
               });
             } else {
-              // Use FileManager.Import (default)
+              // Use FileManager.Import (default) — currentDocument accepts UUID
               promise = self.$.nx.request().then(function(request) {
                 return request.path('/upload/' + batchId + '/' + fileIdx + '/execute/FileManager.Import')
                   .post({
                     body: {
                       params: {
                         context: {
-                          currentDocument: fileParentPath
+                          currentDocument: parentId
                         }
                       },
                       context: {
-                        currentDocument: fileParentPath
+                        currentDocument: parentId
                       }
                     },
                     headers: {
@@ -1323,17 +1330,15 @@ Contributors:
       },
 
       /**
-       * Given the base Nuxeo path and a relativePath like "folder1/subfolder/file.txt",
-       * returns the parent Nuxeo path, e.g., /base/path/folder1/subfolder
+       * Given a relativePath like "folder1/subfolder/file.txt",
+       * returns the parent's relativePath, e.g., "folder1/subfolder".
+       * Returns '' for top-level items (no parent folder in the tree).
        */
-      _getParentNuxeoPath: function(basePath, relativePath) {
+      _getParentRelativePath: function(relativePath) {
         var parts = relativePath.split('/');
         // Remove the last part (the item name itself)
         parts.pop();
-        if (parts.length === 0) {
-          return basePath;
-        }
-        return basePath + '/' + parts.join('/');
+        return parts.join('/');
       }
     });
   </script>
