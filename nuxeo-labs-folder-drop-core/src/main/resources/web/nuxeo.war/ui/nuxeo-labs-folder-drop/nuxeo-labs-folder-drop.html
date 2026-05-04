@@ -750,17 +750,18 @@ Contributors:
           return a.relativePath.localeCompare(b.relativePath);
         });
 
+        var self = this;
         sorted.forEach(function(item) {
           var depth = item.relativePath.split('/').length - 1;
           var indent = '';
           for (var i = 0; i < depth; i++) {
             indent += '  ';
           }
-          var icon = item.isFolder ? '\uD83D\uDCC1 ' : '\uD83D\uDCC4 ';
-          lines.push(indent + icon + item.name);
           if (item.isFolder) {
+            lines.push(indent + '\uD83D\uDCC1 ' + item.name);
             folders++;
           } else {
+            lines.push(indent + '\uD83D\uDCC4 ' + item.name + '  (' + self._formatSize(item.size) + ')');
             fileCount++;
             totalSize += item.size || 0;
           }
