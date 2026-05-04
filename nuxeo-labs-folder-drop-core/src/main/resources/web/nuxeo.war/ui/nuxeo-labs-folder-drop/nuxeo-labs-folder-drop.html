@@ -217,7 +217,10 @@ Contributors:
 
       <!-- Warning message (e.g., duplicate items) -->
       <template is="dom-if" if="[[_warningMessage]]">
-        <div class="warning-message">[[_warningMessage]]</div>
+        <div class="warning-message">
+          <div>[[_warningMessage]]</div>
+          <div>[[i18n('folderDrop.warning.duplicates.hint')]]</div>
+        </div>
       </template>
 
       <!-- Phase: Upload files (default / sequential mode) -->
