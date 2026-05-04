@@ -19,7 +19,7 @@ Contributors:
 
 <dom-module id="nuxeo-labs-folder-drop">
   <template>
-    <style>
+    <style include="nuxeo-styles nuxeo-action-button-styles">
       :host {
         display: inline-block;
       }
@@ -652,6 +652,11 @@ Contributors:
 
         function readEntry(entry, parentPath) {
           return new Promise(function(resolve, reject) {
+            // Skip hidden files/folders (names starting with '.')
+            if (entry.name.charAt(0) === '.') {
+              resolve();
+              return;
+            }
             // Reject entry names containing path traversal sequences
             if (entry.name.indexOf('..') !== -1 || entry.name.indexOf('/') !== -1 || entry.name.indexOf('\\') !== -1) {
               reject(new Error('Invalid entry name: ' + entry.name));
