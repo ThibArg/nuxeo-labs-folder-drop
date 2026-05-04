@@ -162,7 +162,7 @@ Contribute an XML extension to set the callback chain:
 > ```
 
 
-### Chain Contract
+### Chain Syntax
 
 The callback chain is called **once per item** in the tree. It receives:
 
@@ -235,6 +235,10 @@ If the chain does not set `FolderDrop_Result` for a specific item, the default a
 
 ### Automation Operation: `FolderDrop.ResolveTypes`
 
+> [!NOTE]
+> This operation is used internally by the plugin, you llikely don't need to call it explicitly. It is documented for transparency.
+> Of course, it is possible to override it if you want to change the behavior: Just write an operation with the exact same ID (`FolderDrop.ResolveTypes`), and make sure to have the same behabior.
+
 | | |
 |---|---|
 | **ID** | `FolderDrop.ResolveTypes` |
@@ -252,7 +256,9 @@ If the chain does not set `FolderDrop_Result` for a specific item, the default a
 | | `<mimeTypeDenyPatterns>regex1,regex2</mimeTypeDenyPatterns>` |
 | | `<filterHiddenFiles>true\|false</filterHiddenFiles>` |
 
-## How to Build
+## How to Build and Deploy
+
+### Build and Deploy Locally
 
 ```bash
 git clone https://github.com/nuxeo-sandbox/nuxeo-labs-folder-drop
@@ -272,6 +278,14 @@ Install it via `nuxeoctl`:
 nuxeoctl mp-install nuxeo-labs-folder-drop-package-2025.1.0-SNAPSHOT.zip
 ```
 
+### Deploy from Nuxeo Marketplace
+
+This plugin will be available as a package on the [Nuxeo Marketplace](https://connect.nuxeo.com/nuxeo/site/marketplace), you can just:
+```bash
+nuxeoctl mp-install nuxeo-labs-folder-drop
+```
+
+
 ## Support
 
 **These features are not part of the Nuxeo Production platform.**
@@ -279,10 +293,6 @@ nuxeoctl mp-install nuxeo-labs-folder-drop-package-2025.1.0-SNAPSHOT.zip
 These solutions are provided for inspiration and we encourage customers to use them as code samples and learning resources.
 
 This is a moving project (no API maintenance, no deprecation process, etc.) If any of these solutions are found to be useful for the Nuxeo Platform in general, they will be integrated directly into the platform, not maintained here.
-
-## Installation
-
-This plugin will be available as a package on the [Nuxeo Marketplace](https://connect.nuxeo.com/nuxeo/site/marketplace).
 
 ## License
 
