@@ -64,12 +64,16 @@ The plugin enforces limits on the number of files and total size that can be upl
 |---|---|---|
 | `org.nuxeo.web.ui.folderDrop.maxFiles` | `500` | Maximum number of files allowed per drop |
 | `org.nuxeo.web.ui.folderDrop.maxTotalSizeInBytes` | `2147483648` (2 GB) | Maximum total size in bytes allowed per drop |
+| `org.nuxeo.web.ui.folderDrop.filterHiddenFiles` | `true` | Filter files/folders whose name starts with `.` (e.g., `.DS_Store`, `.git`) |
+| `org.nuxeo.web.ui.folderDrop.mimeTypeDenyPatterns` | *(empty)* | Comma-separated list of regex patterns to deny files by MIME type |
 
 Example `nuxeo.conf`:
 
 ```
 org.nuxeo.web.ui.folderDrop.maxFiles=1000
 org.nuxeo.web.ui.folderDrop.maxTotalSizeInBytes=5368709120
+org.nuxeo.web.ui.folderDrop.filterHiddenFiles=true
+org.nuxeo.web.ui.folderDrop.mimeTypeDenyPatterns=video/.*,application/x-executable
 ```
 
 These properties can also be overridden via an XML contribution to `org.nuxeo.runtime.ConfigurationService`.
@@ -88,6 +92,48 @@ Without any additional configuration:
 
 - **Folders** are created as `Folder` document type
 - **Files** are imported using the Nuxeo `FileManager.Import` operation, which auto-detects the document type from the MIME type (e.g., a `.pdf` becomes a `File`, a `.png` becomes a `Picture`, etc.)
+
+## File Filtering
+
+The plugin supports two types of file filtering to control which files are accepted during import.
+
+### Hidden Files
+
+By default, files and folders whose name starts with `.` are filtered out (e.g., `.DS_Store`, `.git`, `.thumbs`). On macOS and Windows, hidden files start with `.`. This behavior is controlled by `org.nuxeo.web.ui.folderDrop.filterHiddenFiles` (default: `true`).
+
+### MIME Type Deny Patterns
+
+You can configure a comma-separated list of **regex patterns** to deny files by MIME type. Each pattern is a standard Java/JavaScript regular expression matched against the full MIME type string.
+
+Examples:
+
+| Pattern | Effect |
+|---|---|
+| `video/.*` | Deny all video files |
+| `application/x-executable` | Deny executable files (exact match) |
+| `application/x-msdownload` | Deny Windows executables |
+| `video/.*,application/x-executable` | Deny videos and executables |
+| `.*\/.*` | Deny all files (not recommended) |
+
+### Enforcement
+
+Filtering is enforced at **two levels**:
+
+1. **Client-side**: Files matching deny patterns or hidden file rules are silently excluded during the folder scan, before upload. They do not appear in the tree preview and are not uploaded.
+2. **Server-side**: The server validates all received items against the same rules. If any denied file reaches the server (which should not happen unless the client was tampered with), the entire import is **rejected** with an explicit error message.
+
+### XML Configuration
+
+The filtering settings can also be configured via XML contribution, which supports `nuxeo.conf` variable substitution:
+
+```xml
+<extension target="nuxeo.labs.folderdrop.FolderDropService" point="configuration">
+  <configuration>
+    <mimeTypeDenyPatterns>${org.nuxeo.web.ui.folderDrop.mimeTypeDenyPatterns:=}</mimeTypeDenyPatterns>
+    <filterHiddenFiles>${org.nuxeo.web.ui.folderDrop.filterHiddenFiles:=true}</filterHiddenFiles>
+  </configuration>
+</extension>
+```
 
 ## Callback Chain
 
@@ -203,6 +249,8 @@ If the chain does not set `FolderDrop_Result` for a specific item, the default a
 |--------|------------------------------------------|
 | Point | `configuration` |
 | Descriptor | `<callbackChain>chainId</callbackChain>` |
+| | `<mimeTypeDenyPatterns>regex1,regex2</mimeTypeDenyPatterns>` |
+| | `<filterHiddenFiles>true\|false</filterHiddenFiles>` |
 
 ## How to Build
 

@@ -17,19 +17,19 @@
       <outputType>document</outputType>
       <category>javascript</category>
       <param name="name" type="string"/>
-      <param name="isFolder" type="boolean"/>
-      <param name="mimeType" type="string"/>
+      <param name="is_folder" type="boolean"/>
+      <param name="mime_type" type="string"/>
       <param name="size" type="long"/>
-      <param name="relativePath" type="string"/>
+      <param name="relative_path" type="string"/>
       <description>Test callback chain for FolderDrop</description>
       <script><![CDATA[function run(input, params) {
 
         var result = {};
 
-        if (params.isFolder) {
+        if (params.is_folder) {
           result.docType = "Workspace";
         } else {
-          var mime = params.mimeType || "";
+          var mime = params.mime_type || "";
           if (mime.indexOf("image/") === 0) {
             result.docType = "Picture";
           } else if (mime.indexOf("text/") === 0) {

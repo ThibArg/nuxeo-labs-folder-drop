@@ -18,6 +18,7 @@
  */
 package nuxeo.labs.folderdrop;
 
+import org.apache.commons.lang3.StringUtils;
 import org.nuxeo.common.xmap.annotation.XNode;
 import org.nuxeo.common.xmap.annotation.XObject;
 
@@ -29,6 +30,8 @@ import org.nuxeo.common.xmap.annotation.XObject;
  * &lt;extension target="nuxeo.labs.folderdrop.FolderDropService" point="configuration"&gt;
  *   &lt;configuration&gt;
  *     &lt;callbackChain&gt;myChainId&lt;/callbackChain&gt;
+ *     &lt;mimeTypeDenyPatterns&gt;video/.*,application/x-executable&lt;/mimeTypeDenyPatterns&gt;
+ *     &lt;filterHiddenFiles&gt;true&lt;/filterHiddenFiles&gt;
  *   &lt;/configuration&gt;
  * &lt;/extension&gt;
  * </pre>
@@ -41,7 +44,27 @@ public class FolderDropDescriptor {
     @XNode("callbackChain")
     protected String callbackChain;
 
+    @XNode("mimeTypeDenyPatterns")
+    protected String mimeTypeDenyPatterns;
+
+    @XNode("filterHiddenFiles")
+    protected String filterHiddenFiles;
+
     public String getCallbackChain() {
         return callbackChain;
+    }
+
+    public String getMimeTypeDenyPatterns() {
+        return mimeTypeDenyPatterns;
+    }
+
+    /**
+     * Returns true if hidden files should be filtered (default: true).
+     */
+    public boolean isFilterHiddenFiles() {
+        if (StringUtils.isBlank(filterHiddenFiles)) {
+            return true;
+        }
+        return !"false".equalsIgnoreCase(filterHiddenFiles.trim());
     }
 }

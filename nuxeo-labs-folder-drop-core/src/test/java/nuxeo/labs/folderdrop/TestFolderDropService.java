@@ -23,6 +23,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import jakarta.inject.Inject;
 
@@ -35,6 +36,7 @@ import org.nuxeo.ecm.automation.OperationException;
 import org.nuxeo.ecm.core.api.Blob;
 import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.api.DocumentModel;
+import org.nuxeo.ecm.core.api.NuxeoException;
 import org.nuxeo.ecm.platform.test.PlatformFeature;
 import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.Features;
@@ -65,6 +67,25 @@ public class TestFolderDropService {
             + "{\"name\":\"subfolder\",\"relativePath\":\"folder1/subfolder\",\"isFolder\":true,\"mimeType\":\"\",\"size\":0},"
             + "{\"name\":\"doc.txt\",\"relativePath\":\"folder1/subfolder/doc.txt\",\"isFolder\":false,\"mimeType\":\"text/plain\",\"size\":100,\"batchFileIndex\":2},"
             + "{\"name\":\"folder2\",\"relativePath\":\"folder2\",\"isFolder\":true,\"mimeType\":\"\",\"size\":0}"
+            + "]";
+
+    /** Tree containing a video file (denied by test-deny-patterns.xml) */
+    private static final String TREE_WITH_VIDEO = "["
+            + "{\"name\":\"folder1\",\"relativePath\":\"folder1\",\"isFolder\":true,\"mimeType\":\"\",\"size\":0},"
+            + "{\"name\":\"movie.mp4\",\"relativePath\":\"folder1/movie.mp4\",\"isFolder\":false,\"mimeType\":\"video/mp4\",\"size\":99999,\"batchFileIndex\":0}"
+            + "]";
+
+    /** Tree containing a hidden file */
+    private static final String TREE_WITH_HIDDEN = "["
+            + "{\"name\":\"folder1\",\"relativePath\":\"folder1\",\"isFolder\":true,\"mimeType\":\"\",\"size\":0},"
+            + "{\"name\":\".DS_Store\",\"relativePath\":\"folder1/.DS_Store\",\"isFolder\":false,\"mimeType\":\"application/octet-stream\",\"size\":100,\"batchFileIndex\":0},"
+            + "{\"name\":\"file1.pdf\",\"relativePath\":\"folder1/file1.pdf\",\"isFolder\":false,\"mimeType\":\"application/pdf\",\"size\":12345,\"batchFileIndex\":1}"
+            + "]";
+
+    /** Tree with only clean files (no denied content) */
+    private static final String TREE_CLEAN = "["
+            + "{\"name\":\"folder1\",\"relativePath\":\"folder1\",\"isFolder\":true,\"mimeType\":\"\",\"size\":0},"
+            + "{\"name\":\"file1.pdf\",\"relativePath\":\"folder1/file1.pdf\",\"isFolder\":false,\"mimeType\":\"application/pdf\",\"size\":12345,\"batchFileIndex\":0}"
             + "]";
 
     @Inject
@@ -188,5 +209,76 @@ public class TestFolderDropService {
 
         // subfolder → "OrderedFolder"
         assertEquals("OrderedFolder", items.get(3).get("docType").asText());
+    }
+
+    // ==================== File Filtering Tests ====================
+
+    @Test
+    @Deploy("nuxeo.labs.folderdrop.nuxeo-labs-folder-drop-core:test-deny-patterns.xml")
+    public void testDenyPatternRejectsVideo() {
+        // video/mp4 should be denied by the pattern video/.*
+        try {
+            service.resolveTypes(session, TREE_WITH_VIDEO, testFolder.getPathAsString());
+            fail("Expected NuxeoException for denied MIME type");
+        } catch (NuxeoException e) {
+            assertTrue(e.getMessage().contains("movie.mp4"));
+            assertTrue(e.getMessage().contains("video/mp4"));
+            assertTrue(e.getMessage().contains("client-side tampering"));
+        }
+    }
+
+    @Test
+    @Deploy("nuxeo.labs.folderdrop.nuxeo-labs-folder-drop-core:test-deny-patterns.xml")
+    public void testDenyPatternAllowsCleanFiles() throws IOException {
+        // application/pdf should not be denied by video/.* or application/x-executable
+        String result = service.resolveTypes(session, TREE_CLEAN, testFolder.getPathAsString());
+        assertNotNull(result);
+        ArrayNode items = (ArrayNode) MAPPER.readTree(result);
+        assertEquals(2, items.size());
+    }
+
+    @Test
+    public void testHiddenFileRejectedByDefault() {
+        // Default config has filterHiddenFiles=true
+        try {
+            service.resolveTypes(session, TREE_WITH_HIDDEN, testFolder.getPathAsString());
+            fail("Expected NuxeoException for hidden file");
+        } catch (NuxeoException e) {
+            assertTrue(e.getMessage().contains(".DS_Store"));
+            assertTrue(e.getMessage().contains("hidden file/folder"));
+            assertTrue(e.getMessage().contains("client-side tampering"));
+        }
+    }
+
+    @Test
+    @Deploy("nuxeo.labs.folderdrop.nuxeo-labs-folder-drop-core:test-no-hidden-filter.xml")
+    public void testHiddenFileAllowedWhenDisabled() throws IOException {
+        assertFalse(service.isFilterHiddenFiles());
+        // With filterHiddenFiles=false, hidden files should pass through
+        String result = service.resolveTypes(session, TREE_WITH_HIDDEN, testFolder.getPathAsString());
+        assertNotNull(result);
+        ArrayNode items = (ArrayNode) MAPPER.readTree(result);
+        assertEquals(3, items.size());
+    }
+
+    @Test
+    @Deploy("nuxeo.labs.folderdrop.nuxeo-labs-folder-drop-core:test-deny-patterns.xml")
+    public void testIsMimeTypeDenied() {
+        assertTrue(service.isMimeTypeDenied("video/mp4"));
+        assertTrue(service.isMimeTypeDenied("video/avi"));
+        assertTrue(service.isMimeTypeDenied("application/x-executable"));
+        assertFalse(service.isMimeTypeDenied("application/pdf"));
+        assertFalse(service.isMimeTypeDenied("image/png"));
+        assertFalse(service.isMimeTypeDenied("text/plain"));
+    }
+
+    @Test
+    public void testFilterHiddenFilesDefaultIsTrue() {
+        assertTrue(service.isFilterHiddenFiles());
+    }
+
+    @Test
+    public void testNoDenyPatternsByDefault() {
+        assertTrue(service.getMimeTypeDenyPatterns().isEmpty());
     }
 }

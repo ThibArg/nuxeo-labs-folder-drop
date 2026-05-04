@@ -183,7 +183,7 @@ Contributors:
     <nuxeo-tooltip for="dropFolderBtn">[[i18n('folderDrop.action.tooltip')]]</nuxeo-tooltip>
 
     <!-- The dialog -->
-    <nuxeo-dialog id="dialog" with-backdrop no-auto-focus>
+    <nuxeo-dialog id="dialog" with-backdrop no-auto-focus modal>
       <h2>[[i18n('folderDrop.dialog.title')]]</h2>
 
       <!-- Drop zone (visible before upload starts and config is valid) -->
@@ -276,7 +276,7 @@ Contributors:
       <!-- Buttons -->
       <div class="buttons">
         <!-- Cancel / Close -->
-        <paper-button dialog-dismiss on-tap="_close" disabled="[[_uploading]]">
+        <paper-button on-tap="_close" disabled="[[_uploading]]">
           [[_closeButtonLabel]]
         </paper-button>
 
@@ -479,6 +479,18 @@ Contributors:
         _maxTotalSizeInBytes: {
           type: Number,
           value: 2147483648
+        },
+
+        /** Whether to filter hidden files (names starting with '.') */
+        _filterHiddenFiles: {
+          type: Boolean,
+          value: true
+        },
+
+        /** Compiled RegExp objects for MIME type deny patterns */
+        _denyPatterns: {
+          type: Array,
+          value: function() { return []; }
         }
       },
 
@@ -517,6 +529,31 @@ Contributors:
 
         this._maxFiles = maxFiles;
         this._maxTotalSizeInBytes = maxSize;
+
+        // Filter hidden files config
+        var rawFilterHidden = config && config.get ? config.get('folderDrop.filterHiddenFiles', 'true') : 'true';
+        this._filterHiddenFiles = rawFilterHidden !== 'false';
+
+        // MIME type deny patterns
+        var rawDenyPatterns = config && config.get ? config.get('folderDrop.mimeTypeDenyPatterns', '') : '';
+        this._denyPatterns = [];
+        if (rawDenyPatterns) {
+          var parts = rawDenyPatterns.split(',');
+          for (var i = 0; i < parts.length; i++) {
+            var trimmed = parts[i].trim();
+            if (trimmed) {
+              try {
+                this._denyPatterns.push(new RegExp('^' + trimmed + '$'));
+              } catch (e) {
+                console.error('[nuxeo-labs-folder-drop] Invalid MIME type deny pattern: ' + trimmed, e);
+                this._configValid = false;
+                this._errorMessage = this.i18n('folderDrop.error.invalidConfig');
+                return;
+              }
+            }
+          }
+        }
+
         this._configValid = true;
       },
 
@@ -556,6 +593,8 @@ Contributors:
         this._configValid = true;
         this._maxFiles = 500;
         this._maxTotalSizeInBytes = 2147483648;
+        this._filterHiddenFiles = true;
+        this._denyPatterns = [];
         this._uploader = null;
         this._batchId = null;
       },
@@ -566,6 +605,7 @@ Contributors:
           this.fire('document-updated');
           this.fire('navigate', { doc: this.document });
         }
+        this.$.dialog.toggle();
       },
 
       _onDragOver: function(e) {
@@ -667,8 +707,8 @@ Contributors:
 
         function readEntry(entry, parentPath) {
           return new Promise(function(resolve, reject) {
-            // Skip hidden files/folders (names starting with '.')
-            if (entry.name.charAt(0) === '.') {
+            // Skip hidden files/folders (names starting with '.') if configured
+            if (self._filterHiddenFiles && entry.name.charAt(0) === '.') {
               resolve();
               return;
             }
@@ -681,13 +721,24 @@ Contributors:
 
             if (entry.isFile) {
               entry.file(function(file) {
+                var fileMimeType = file.type || 'application/octet-stream';
+                // Check MIME type deny patterns
+                if (self._denyPatterns.length > 0) {
+                  for (var p = 0; p < self._denyPatterns.length; p++) {
+                    if (self._denyPatterns[p].test(fileMimeType)) {
+                      // Skip denied file
+                      resolve();
+                      return;
+                    }
+                  }
+                }
                 var fileIndex = files.length;
                 files.push(file);
                 items.push({
                   name: entry.name,
                   relativePath: relativePath,
                   isFolder: false,
-                  mimeType: file.type || 'application/octet-stream',
+                  mimeType: fileMimeType,
                   size: file.size,
                   fileIndex: fileIndex
                 });

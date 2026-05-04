@@ -19,8 +19,13 @@
 package nuxeo.labs.folderdrop;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
@@ -45,7 +50,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  * Implementation of the {@link FolderDropService}.
  * <p>
  * Registers an extension point "configuration" that accepts a {@link FolderDropDescriptor}
- * with an optional callbackChain.
+ * with an optional callbackChain, mimeTypeDenyPatterns, and filterHiddenFiles.
  *
  * @since 2025.1
  */
@@ -59,10 +64,37 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
 
     protected FolderDropDescriptor descriptor;
 
+    /** Compiled deny patterns, built on registration and cached. */
+    protected List<Pattern> compiledDenyPatterns;
+
+    /** Raw deny pattern strings, parsed from the descriptor. */
+    protected List<String> denyPatternStrings;
+
     @Override
     public void registerContribution(Object contribution, String extensionPoint, ComponentInstance contributor) {
         if (EXT_POINT.equals(extensionPoint)) {
             descriptor = (FolderDropDescriptor) contribution;
+            // Parse and validate deny patterns at startup
+            compiledDenyPatterns = new ArrayList<>();
+            denyPatternStrings = new ArrayList<>();
+            String rawPatterns = descriptor.getMimeTypeDenyPatterns();
+            if (StringUtils.isNotBlank(rawPatterns)) {
+                String[] parts = rawPatterns.split(",");
+                for (String part : parts) {
+                    String trimmed = part.trim();
+                    if (StringUtils.isNotBlank(trimmed)) {
+                        try {
+                            compiledDenyPatterns.add(Pattern.compile(trimmed));
+                            denyPatternStrings.add(trimmed);
+                        } catch (PatternSyntaxException e) {
+                            throw new NuxeoException(
+                                    "Invalid MIME type deny pattern '" + trimmed + "': " + e.getMessage(), e);
+                        }
+                    }
+                }
+            }
+            log.info("FolderDrop configuration registered: callbackChain='{}', filterHiddenFiles={}, denyPatterns={}",
+                    descriptor.getCallbackChain(), descriptor.isFilterHiddenFiles(), denyPatternStrings);
         }
     }
 
@@ -74,6 +106,35 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
     @Override
     public String getCallbackChain() {
         return descriptor != null ? descriptor.getCallbackChain() : null;
+    }
+
+    @Override
+    public boolean isFilterHiddenFiles() {
+        return descriptor == null || descriptor.isFilterHiddenFiles();
+    }
+
+    @Override
+    public List<String> getMimeTypeDenyPatterns() {
+        return denyPatternStrings != null ? Collections.unmodifiableList(denyPatternStrings)
+                : Collections.emptyList();
+    }
+
+    @Override
+    public boolean isMimeTypeDenied(String mimeType) {
+        if (StringUtils.isBlank(mimeType) || compiledDenyPatterns == null || compiledDenyPatterns.isEmpty()) {
+            return false;
+        }
+        for (Pattern pattern : compiledDenyPatterns) {
+            try {
+                if (pattern.matcher(mimeType).matches()) {
+                    return true;
+                }
+            } catch (Exception e) {
+                throw new NuxeoException("Error evaluating MIME type deny pattern '" + pattern.pattern()
+                        + "' against MIME type '" + mimeType + "'", e);
+            }
+        }
+        return false;
     }
 
     private static final int MAX_ITEMS = 10000;
@@ -92,6 +153,9 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
                         "Too many items in tree (" + items.size() + "). Maximum allowed is " + MAX_ITEMS);
             }
 
+            // Validate items against file filters before resolving types
+            validateFilters(items);
+
             if (!hasCallbackChain()) {
                 return resolveDefaults(items);
             }
@@ -103,7 +167,53 @@ public class FolderDropServiceImpl extends DefaultComponent implements FolderDro
     }
 
     /**
-     * Default resolution: folders → "Folder", files → null (FileManager.Import).
+     * Validates all items against configured file filters.
+     * Throws a NuxeoException if any denied items are found, listing them with reasons.
+     * Items that reach the server despite being denied should have been filtered client-side,
+     * which may indicate client-side tampering.
+     */
+    protected void validateFilters(ArrayNode items) {
+        boolean filterHidden = isFilterHiddenFiles();
+        boolean hasDenyPatterns = compiledDenyPatterns != null && !compiledDenyPatterns.isEmpty();
+
+        if (!filterHidden && !hasDenyPatterns) {
+            return;
+        }
+
+        List<String> rejectedItems = new ArrayList<>();
+
+        for (int i = 0; i < items.size(); i++) {
+            JsonNode item = items.get(i);
+            if (!(item instanceof ObjectNode)) {
+                continue;
+            }
+            ObjectNode obj = (ObjectNode) item;
+            String name = obj.path("name").asText("");
+            boolean isFolder = obj.path("isFolder").asBoolean(false);
+            String mimeType = obj.path("mimeType").asText("");
+            String relativePath = obj.path("relativePath").asText(name);
+
+            // Check hidden files/folders
+            if (filterHidden && name.length() > 0 && name.charAt(0) == '.') {
+                rejectedItems.add(relativePath + " (hidden file/folder)");
+                continue;
+            }
+
+            // Check MIME type deny patterns (only for files, not folders)
+            if (!isFolder && hasDenyPatterns && isMimeTypeDenied(mimeType)) {
+                rejectedItems.add(relativePath + " (denied MIME type: " + mimeType + ")");
+            }
+        }
+
+        if (!rejectedItems.isEmpty()) {
+            throw new NuxeoException(
+                    "The following files should have been filtered client-side but were received by the server, "
+                            + "which may indicate client-side tampering. Rejected: " + rejectedItems);
+        }
+    }
+
+    /**
+     * Default resolution: folders -> "Folder", files -> null (FileManager.Import).
      */
     protected String resolveDefaults(ArrayNode items) {
         for (int i = 0; i < items.size(); i++) {

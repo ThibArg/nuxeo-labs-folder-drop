@@ -18,6 +18,8 @@
  */
 package nuxeo.labs.folderdrop;
 
+import java.util.List;
+
 import org.nuxeo.ecm.core.api.CoreSession;
 
 /**
@@ -29,6 +31,8 @@ import org.nuxeo.ecm.core.api.CoreSession;
  * <p>
  * Without a callback chain, folders default to "Folder" and files return null
  * (meaning FileManager.Import should be used).
+ * <p>
+ * Supports file filtering via MIME type deny patterns (regex) and hidden file filtering.
  *
  * @since 2025.1
  */
@@ -47,7 +51,7 @@ public interface FolderDropService {
     String PARAM_IS_FOLDER = "is_folder";
 
     /** Parameter passed to the callback chain: the MIME type (for files, empty for folders). */
-    String PARAM_MIME_TYPE = "mime_type";// In Studio, can't have mimeType ("Type" is forbidden in a lower orUpperCamelCase name
+    String PARAM_MIME_TYPE = "mime_type";
 
     /** Parameter passed to the callback chain: the file size in bytes (for files, 0 for folders). */
     String PARAM_SIZE = "size";
@@ -66,6 +70,26 @@ public interface FolderDropService {
     String getCallbackChain();
 
     /**
+     * Returns true if hidden files (names starting with '.') should be filtered.
+     * Default is true.
+     */
+    boolean isFilterHiddenFiles();
+
+    /**
+     * Returns the list of MIME type deny patterns (regex strings).
+     * Returns an empty list if none are configured.
+     */
+    List<String> getMimeTypeDenyPatterns();
+
+    /**
+     * Checks if a given MIME type matches any of the configured deny patterns.
+     *
+     * @param mimeType the MIME type to check
+     * @return true if the MIME type is denied
+     */
+    boolean isMimeTypeDenied(String mimeType);
+
+    /**
      * Resolves document types for a tree of items.
      * <p>
      * Input JSON is an array of items:
@@ -80,6 +104,11 @@ public interface FolderDropService {
      * Returns the same array with a "docType" field added to each item.
      * For default behavior (no callback): folders get "Folder", files get null.
      * With a callback chain: the chain determines the docType for each item.
+     * <p>
+     * Before resolving types, the method validates items against the configured
+     * file filters (hidden files, MIME type deny patterns). If any denied items
+     * are found, a {@link org.nuxeo.ecm.core.api.NuxeoException} is thrown with
+     * details about the rejected files, as they should have been filtered client-side.
      *
      * @param session the core session
      * @param treeJson the JSON array of items to resolve
