@@ -2,12 +2,7 @@
 
 ## TL;DR
 
-Drag-and-drop folder import for Nuxeo Web UI (LTS 2025). Drop folders from your desktop onto any Folderish document to create the full hierarchy in Nuxeo. Also provides:
-
-* S3 direct upload,
-* Configurable file filtering,
-* Custom document type resolution via callback chain
-* and a server-side event on completion.
+Drag-and-drop folder import for Nuxeo Web UI (LTS 2025). Drop folders from your desktop onto any Folderish document to create the full hierarchy in Nuxeo. Also provides: S3 direct upload, configurable file filtering, custom document type resolution via callback chain, and a server-side event on completion.
 
 > [!NOTE]
 > This is Work In Progress - Not ready for use
