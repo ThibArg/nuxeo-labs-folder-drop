@@ -60,6 +60,25 @@ public interface FolderDropService {
     String PARAM_RELATIVE_PATH = "relative_path";
 
     /**
+     * Event name fired after a folder drop import completes (success, partial, or failure).
+     * <p>
+     * The event is a {@code DocumentEventContext} on the parent document, with the following
+     * context properties:
+     * <ul>
+     *   <li>{@code status} — "success", "partial", or "failure"</li>
+     *   <li>{@code parentId} — UUID of the parent document</li>
+     *   <li>{@code droppedFolderCount} — number of folders in the dropped tree</li>
+     *   <li>{@code droppedFileCount} — number of files in the dropped tree</li>
+     *   <li>{@code createdCount} — number of documents actually created</li>
+     *   <li>{@code failedItem} — relative path of the item that failed (null on success)</li>
+     *   <li>{@code failedMessage} — server error message (null on success)</li>
+     * </ul>
+     *
+     * @since 2025.1
+     */
+    String EVENT_IMPORT_DONE = "folderDropImportDone";
+
+    /**
      * Returns true if a callback chain is configured.
      */
     boolean hasCallbackChain();

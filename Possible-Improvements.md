@@ -35,3 +35,9 @@ Currently, when dropped items have the same title as existing children of the ta
 - **Reject** — refuse the import if any top-level item already exists
 - **Merge** — reuse existing folders by title match, create only missing subfolders, import files into existing or new folders
 - **Replace** — delete the existing item and its children, then create the new one (destructive — requires careful UX)
+
+## Enrich `folderDropImportDone` Event with Created Document UUIDs
+
+The `folderDropImportDone` event currently provides counts and the parent document ID. A future version could enrich the event context with the UUIDs of all created documents, allowing listeners to act on the exact documents that were imported (e.g., start a workflow, apply metadata, trigger processing).
+
+This would require the client to collect all document UUIDs during creation (some are already tracked in the `pathToId` map for folders) and pass them back to the `FolderDrop.NotifyDone` operation as an additional parameter.

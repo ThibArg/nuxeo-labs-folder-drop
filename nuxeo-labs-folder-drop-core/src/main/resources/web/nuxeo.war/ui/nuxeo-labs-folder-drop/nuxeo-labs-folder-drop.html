@@ -221,6 +221,7 @@ Contributors:
 
     <nuxeo-connection id="nx"></nuxeo-connection>
     <nuxeo-operation id="resolveTypesOp" op="FolderDrop.ResolveTypes"></nuxeo-operation>
+    <nuxeo-operation id="notifyDoneOp" op="FolderDrop.NotifyDone"></nuxeo-operation>
 
     <!-- The action button -->
     <paper-icon-button id="dropFolderBtn" icon="icons:folder" on-tap="_openDialog" noink></paper-icon-button>
@@ -1030,8 +1031,23 @@ Contributors:
         this._uploading = true;
         this._errorMessage = '';
         this._batchId = null;
+        this._createdCount = 0;
+        this._currentItemPath = '';
 
         var self = this;
+
+        // Compute dropped counts from _items
+        var droppedFolderCount = 0;
+        var droppedFileCount = 0;
+        this._items.forEach(function(item) {
+          if (item.isFolder) {
+            droppedFolderCount++;
+          } else {
+            droppedFileCount++;
+          }
+        });
+        this._droppedFolderCount = droppedFolderCount;
+        this._droppedFileCount = droppedFileCount;
 
         // Step 1: Upload all files to a batch
         this._uploadFiles().then(function(batchId) {
@@ -1056,6 +1072,8 @@ Contributors:
           self._showImportProgress = false;
           self._uploading = false;
           self._successMessage = self.i18n('folderDrop.success');
+          // Notify success (best-effort)
+          self._notifyDone('success', null, null);
         }).catch(function(err) {
           console.error('[nuxeo-labs-folder-drop] Import failed:', err);
           self._showUploadProgress = false;
@@ -1063,6 +1081,11 @@ Contributors:
           self._showImportProgress = false;
           self._uploading = false;
           self._errorMessage = self.i18n('folderDrop.error.importFailed');
+          // Determine status: partial if some docs were created, failure otherwise
+          var status = self._createdCount > 0 ? 'partial' : 'failure';
+          var failedMessage = err && err.message ? err.message : String(err);
+          // Notify failure (best-effort)
+          self._notifyDone(status, self._currentItemPath, failedMessage);
           // Clean up the batch if it was created
           if (self._batchId) {
             self._deleteBatch(self._batchId);
@@ -1405,6 +1428,7 @@ Contributors:
         var chain = Promise.resolve();
         folders.forEach(function(folder) {
           chain = chain.then(function() {
+            self._currentItemPath = folder.relativePath;
             var parentRelPath = self._getParentRelativePath(folder.relativePath);
             var parentId = pathToId[parentRelPath];
             var docType = folder.docType || 'Folder';
@@ -1426,6 +1450,7 @@ Contributors:
               // Store the UUID of the created folder for child lookups
               pathToId[folder.relativePath] = response.uid;
               created++;
+              self._createdCount = created;
               self._importProgressValue = created;
               self._importProgressLabel = self.i18n('folderDrop.progress.creatingDocs.count',
                 created.toString(), totalDocs.toString());
@@ -1459,6 +1484,7 @@ Contributors:
         var chain = Promise.resolve();
         files.forEach(function(file) {
           chain = chain.then(function() {
+            self._currentItemPath = file.relativePath;
             var parentRelPath = self._getParentRelativePath(file.relativePath);
             var parentId = pathToId[parentRelPath];
             var fileIdx = file.batchFileIndex !== undefined ? file.batchFileIndex : '0';
@@ -1510,6 +1536,7 @@ Contributors:
 
             return promise.then(function() {
               created++;
+              self._createdCount = created;
               self._importProgressValue = created;
               self._importProgressLabel = self.i18n('folderDrop.progress.creatingDocs.count',
                 created.toString(), totalDocs.toString());
@@ -1518,6 +1545,31 @@ Contributors:
         });
 
         return chain;
+      },
+
+      /**
+       * Fires the folderDropImportDone event via the FolderDrop.NotifyDone operation.
+       * Best-effort: errors are logged but do not affect the user-facing result.
+       */
+      _notifyDone: function(status, failedItem, failedMessage) {
+        var op = this.$.notifyDoneOp;
+        op.params = {
+          parentId: this.document.uid,
+          status: status,
+          droppedFolderCount: this._droppedFolderCount || 0,
+          droppedFileCount: this._droppedFileCount || 0,
+          createdCount: this._createdCount || 0
+        };
+        if (failedItem) {
+          op.params.failedItem = failedItem;
+        }
+        if (failedMessage) {
+          op.params.failedMessage = failedMessage;
+        }
+        op.input = undefined;
+        op.execute().catch(function(err) {
+          console.warn('[nuxeo-labs-folder-drop] Failed to send import done notification:', err);
+        });
       },
 
       /**

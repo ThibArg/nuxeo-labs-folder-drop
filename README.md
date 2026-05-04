@@ -315,6 +315,57 @@ If the chain does not set `FolderDrop_Result` for a specific item, the default a
 | | `<mimeTypeDenyPatterns>regex1,regex2</mimeTypeDenyPatterns>` |
 | | `<filterHiddenFiles>true\|false</filterHiddenFiles>` |
 
+### Automation Operation: `FolderDrop.NotifyDone`
+
+> [!NOTE]
+> This operation is called internally by the plugin after all documents have been created (or after a failure). It is documented here for transparency and to describe the event it fires.
+
+| | |
+|---|---|
+| **ID** | `FolderDrop.NotifyDone` |
+| **Input** | None |
+| **Parameters** | `parentId` (String, required) — UUID of the target parent document |
+| | `status` (String, required) — `"success"`, `"partial"`, or `"failure"` |
+| | `droppedFolderCount` (int, required) — number of folders in the dropped tree |
+| | `droppedFileCount` (int, required) — number of files in the dropped tree |
+| | `createdCount` (int, required) — number of documents actually created |
+| | `failedItem` (String, optional) — relative path of the item that failed |
+| | `failedMessage` (String, optional) — server error message |
+| **Output** | void |
+
+This operation fires the `folderDropImportDone` event (see below).
+
+### Event: `folderDropImportDone`
+
+After a folder drop import completes — whether successfully or with an error — the plugin fires a `folderDropImportDone` event. This is a `DocumentEventContext` on the parent document, with the following context properties:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `status` | String | `"success"` — all items created; `"partial"` — some items created before failure; `"failure"` — no items created |
+| `parentId` | String | UUID of the target parent document |
+| `droppedFolderCount` | int | Number of folders in the dropped tree |
+| `droppedFileCount` | int | Number of files in the dropped tree |
+| `createdCount` | int | Number of documents actually created (folders + files) |
+| `failedItem` | String | Relative path of the item that caused the failure (null on success) |
+| `failedMessage` | String | Server error message (null on success) |
+
+> [!IMPORTANT]
+> Listeners for this event should be registered with `async="true"`. A synchronous listener would block the `FolderDrop.NotifyDone` operation and the client until it completes, degrading the user experience.
+
+**Example listener registration:**
+
+```xml
+<extension target="org.nuxeo.ecm.core.event.EventServiceComponent" point="listener">
+  <listener name="myFolderDropListener"
+            class="com.example.MyFolderDropListener"
+            async="true">
+    <event>folderDropImportDone</event>
+  </listener>
+</extension>
+```
+
+The event name is also available as the constant `FolderDropService.EVENT_IMPORT_DONE` for use in Java code.
+
 ## How to Build and Deploy
 
 ### Build and Deploy Locally

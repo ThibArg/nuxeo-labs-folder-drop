@@ -26,6 +26,7 @@ import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Map;
 
 import jakarta.inject.Inject;
 
@@ -277,5 +278,60 @@ public class TestFolderDropService {
     @Test
     public void testNoDenyPatternsByDefault() {
         assertTrue(service.getMimeTypeDenyPatterns().isEmpty());
+    }
+
+    // ==================== NotifyDone / Event Tests ====================
+
+    @Test
+    @Deploy("nuxeo.labs.folderdrop.nuxeo-labs-folder-drop-core:test-listener.xml")
+    public void testNotifyDoneFiresEvent() throws OperationException {
+        TestFolderDropListener.reset();
+
+        try (var ctx = new OperationContext(session)) {
+            var params = new HashMap<String, Object>();
+            params.put("parentId", testFolder.getId());
+            params.put("status", "success");
+            params.put("droppedFolderCount", 3);
+            params.put("droppedFileCount", 10);
+            params.put("createdCount", 13);
+
+            automationService.run(ctx, FolderDropNotifyDoneOp.ID, params);
+        }
+
+        var events = TestFolderDropListener.getReceivedEvents();
+        assertEquals(1, events.size());
+
+        var event = events.get(0);
+        assertEquals("success", event.get("status"));
+        assertEquals(testFolder.getId(), event.get("parentId"));
+        assertEquals(3, event.get("droppedFolderCount"));
+        assertEquals(10, event.get("droppedFileCount"));
+        assertEquals(13, event.get("createdCount"));
+    }
+
+    @Test
+    @Deploy("nuxeo.labs.folderdrop.nuxeo-labs-folder-drop-core:test-listener.xml")
+    public void testNotifyDonePartialFailure() throws OperationException {
+        TestFolderDropListener.reset();
+
+        try (var ctx = new OperationContext(session)) {
+            var params = new HashMap<String, Object>();
+            params.put("parentId", testFolder.getId());
+            params.put("status", "partial");
+            params.put("droppedFolderCount", 3);
+            params.put("droppedFileCount", 10);
+            params.put("createdCount", 5);
+            params.put("failedItem", "folder1/subfolder/doc.txt");
+            params.put("failedMessage", "Permission denied");
+
+            automationService.run(ctx, FolderDropNotifyDoneOp.ID, params);
+        }
+
+        var events = TestFolderDropListener.getReceivedEvents();
+        assertEquals(1, events.size());
+
+        var event = events.get(0);
+        assertEquals("partial", event.get("status"));
+        assertEquals(5, event.get("createdCount"));
     }
 }
