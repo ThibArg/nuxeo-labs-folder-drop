@@ -1080,17 +1080,28 @@ Contributors:
           self._showResolvingProgress = false;
           self._showImportProgress = false;
           self._uploading = false;
-          // Extract the first line of the error message and truncate if needed
-          var failedMessage = err && err.message ? err.message : String(err);
-          var firstLine = failedMessage.split('\n')[0];
-          if (firstLine.length > 200) {
-            firstLine = firstLine.substring(0, 200) + '...';
-          }
-          self._errorMessage = self.i18n('folderDrop.error.importFailed') + ': ' + firstLine;
           // Determine status: partial if some docs were created, failure otherwise
           var status = self._createdCount > 0 ? 'partial' : 'failure';
-          // Notify failure (best-effort)
-          self._notifyDone(status, self._currentItemPath, failedMessage);
+          // Extract the server error message from the response body if available
+          var errorPromise;
+          if (err.response && typeof err.response.json === 'function') {
+            errorPromise = err.response.json().then(function(body) {
+              return body && body.message ? body.message : (err.message || String(err));
+            }).catch(function() {
+              return err.message || String(err);
+            });
+          } else {
+            errorPromise = Promise.resolve(err.message || String(err));
+          }
+          errorPromise.then(function(failedMessage) {
+            var firstLine = failedMessage.split('\n')[0];
+            if (firstLine.length > 200) {
+              firstLine = firstLine.substring(0, 200) + '...';
+            }
+            self._errorMessage = self.i18n('folderDrop.error.importFailed') + ': ' + firstLine;
+            // Notify failure (best-effort)
+            self._notifyDone(status, self._currentItemPath, failedMessage);
+          });
           // Clean up the batch if it was created
           if (self._batchId) {
             self._deleteBatch(self._batchId);
