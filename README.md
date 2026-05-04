@@ -105,6 +105,17 @@ Contribute an XML extension to set the callback chain:
 </extension>
 ```
 
+> [!IMPORTANT]
+> Remember JS Automation script are prefixed with `javascript.`:
+> ```xml
+> <extension target="nuxeo.labs.folderdrop.FolderDropService" point="configuration">
+>   <configuration>
+>     <callbackChain>javascript.myJSCallbackChain</callbackChain>
+>   </configuration>
+> </extension>
+> ```
+
+
 ### Chain Contract
 
 The callback chain is called **once per item** in the tree. It receives:
