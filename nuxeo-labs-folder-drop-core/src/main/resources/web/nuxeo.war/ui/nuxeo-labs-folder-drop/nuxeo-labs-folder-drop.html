@@ -826,7 +826,7 @@ Contributors:
           ") AND ecm:isVersion = 0 AND ecm:isProxy = 0 AND ecm:isTrashed = 0";
 
         return this.$.nx.request().then(function(request) {
-          return request.path('/search/lang/NXQL/execute')
+          return request.path('/search/execute')
             .queryParams({ query: query, pageSize: 0 })
             .get();
         }).then(function(response) {
