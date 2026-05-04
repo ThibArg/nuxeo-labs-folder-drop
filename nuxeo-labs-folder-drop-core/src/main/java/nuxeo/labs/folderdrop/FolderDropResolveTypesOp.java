@@ -23,8 +23,8 @@ import org.nuxeo.ecm.automation.core.annotations.Operation;
 import org.nuxeo.ecm.automation.core.annotations.OperationMethod;
 import org.nuxeo.ecm.automation.core.annotations.Param;
 import org.nuxeo.ecm.core.api.Blob;
+import org.nuxeo.ecm.core.api.Blobs;
 import org.nuxeo.ecm.core.api.CoreSession;
-import org.nuxeo.ecm.core.api.impl.blob.StringBlob;
 import org.nuxeo.runtime.api.Framework;
 
 /**
@@ -59,6 +59,6 @@ public class FolderDropResolveTypesOp {
     public Blob run() {
         FolderDropService service = Framework.getService(FolderDropService.class);
         String result = service.resolveTypes(session, treeJson, parentPath);
-        return new StringBlob(result, "application/json");
+        return Blobs.createJSONBlob(result);
     }
 }
