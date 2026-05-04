@@ -124,10 +124,10 @@ The callback chain is called **once per item** in the tree. It receives:
 |---|------|-------------|
 | **Input** | `document` | The parent container document |
 | **`name`** | `String` | Name of the item (e.g., `"report.pdf"`) |
-| **`isFolder`** | `boolean` | `true` if the item is a folder |
-| **`mimeType`** | `String` | MIME type of the file (empty string for folders) |
+| **`is_folder`** | `boolean` | `true` if the item is a folder |
+| **`mime_type`** | `String` | MIME type of the file (empty string for folders) |
 | **`size`** | `long` | File size in bytes (0 for folders) |
-| **`relativePath`** | `String` | Relative path within the dropped tree (e.g., `"folder1/subfolder/report.pdf"`) |
+| **`relative_path`** | `String` | Relative path within the dropped tree (e.g., `"folder1/subfolder/report.pdf"`) |
 
 The chain **must set** the context variable `FolderDrop_Result` to a JSON string:
 
@@ -137,15 +137,18 @@ The chain **must set** the context variable `FolderDrop_Result` to a JSON string
 
 ### Example Chain (Automation Scripting)
 
+> [!IMPORTANT]
+> When using JavaScript Automation, parameters **must be explicitly declared** in the chain definition (in Studio or XML). If they are not declared, `params.name`, `params.is_folder`, etc. will be `undefined`.
+
 ```javascript
 // input is the main parent (where the user is currently drag-dropping)
 function run(input, params) {
   var result = {};
   var isDroppingInCustomDocType = input.type === "MyCustomWorkspace";
-  var mime = params.mimeType || "";
+  var mime = params.mime_type || "";
   var isImage = mime.indexOf("image/") === 0;
 
-  if (params.isFolder) {
+  if (params.is_folder) {
     if(isDroppingInCustomDocType) {
       result.docType = "MyCustomFolder";
     } else {

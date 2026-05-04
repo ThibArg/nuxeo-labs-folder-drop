@@ -44,16 +44,16 @@ public interface FolderDropService {
     String PARAM_NAME = "name";
 
     /** Parameter passed to the callback chain: true if the item is a folder. */
-    String PARAM_IS_FOLDER = "isFolder";
+    String PARAM_IS_FOLDER = "is_folder";
 
     /** Parameter passed to the callback chain: the MIME type (for files, empty for folders). */
-    String PARAM_MIME_TYPE = "mimeType";
+    String PARAM_MIME_TYPE = "mime_type";// In Studio, can't have mimeType ("Type" is forbidden in a lower orUpperCamelCase name
 
     /** Parameter passed to the callback chain: the file size in bytes (for files, 0 for folders). */
     String PARAM_SIZE = "size";
 
     /** Parameter passed to the callback chain: the relative path within the dropped tree. */
-    String PARAM_RELATIVE_PATH = "relativePath";
+    String PARAM_RELATIVE_PATH = "relative_path";
 
     /**
      * Returns true if a callback chain is configured.
