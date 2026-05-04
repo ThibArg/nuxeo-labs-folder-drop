@@ -106,6 +106,16 @@ Contributors:
         margin: 8px 0;
       }
 
+      .warning-message {
+        color: var(--nuxeo-warn-text, #f57c00);
+        font-size: 13px;
+        margin: 8px 0;
+        padding: 8px 12px;
+        background: #fff3e0;
+        border: 1px solid #ffe0b2;
+        border-radius: 4px;
+      }
+
       .summary {
         font-size: 13px;
         color: var(--nuxeo-text-default, #3a3a54);
@@ -203,6 +213,11 @@ Contributors:
           [[_treeSummary]]
         </div>
         <div class="tree-preview">[[_treePreview]]</div>
+      </template>
+
+      <!-- Warning message (e.g., duplicate items) -->
+      <template is="dom-if" if="[[_warningMessage]]">
+        <div class="warning-message">[[_warningMessage]]</div>
       </template>
 
       <!-- Phase: Upload files (default / sequential mode) -->
@@ -423,6 +438,11 @@ Contributors:
           value: ''
         },
 
+        _warningMessage: {
+          type: String,
+          value: ''
+        },
+
         _successMessage: {
           type: String,
           value: ''
@@ -584,6 +604,7 @@ Contributors:
         this._importProgressValue = 0;
         this._importProgressMax = 100;
         this._errorMessage = '';
+        this._warningMessage = '';
         this._successMessage = '';
         this._useS3 = false;
         this._inFlightFiles = [];
@@ -635,6 +656,7 @@ Contributors:
         }
 
         this._errorMessage = '';
+        this._warningMessage = '';
         this._successMessage = '';
 
         var dataTransfer = e.dataTransfer;
@@ -689,10 +711,78 @@ Contributors:
             return;
           }
 
-          self._canUpload = true;
+          // Check for duplicate titles at the target level
+          self._checkDuplicates().then(function() {
+            self._canUpload = true;
+          }).catch(function(err) {
+            console.warn('[nuxeo-labs-folder-drop] Duplicate check failed:', err);
+            // Don't block upload if the check fails — just skip the warning
+            self._canUpload = true;
+          });
         }).catch(function(err) {
           console.error('[nuxeo-labs-folder-drop] Failed to read folder contents:', err);
           self._errorMessage = self.i18n('folderDrop.error.readFailed');
+        });
+      },
+
+      /**
+       * Checks if any top-level dropped items have the same title as existing
+       * children of the target document. Sets _warningMessage if duplicates found.
+       */
+      _checkDuplicates: function() {
+        var self = this;
+
+        // Collect names of top-level items (relativePath has no '/')
+        var topLevelNames = [];
+        this._items.forEach(function(item) {
+          if (item.relativePath.indexOf('/') === -1) {
+            topLevelNames.push(item.name);
+          }
+        });
+
+        if (topLevelNames.length === 0) {
+          return Promise.resolve();
+        }
+
+        // De-duplicate names
+        var uniqueNames = [];
+        var seen = {};
+        topLevelNames.forEach(function(name) {
+          if (!seen[name]) {
+            seen[name] = true;
+            uniqueNames.push(name);
+          }
+        });
+
+        // Build NXQL IN clause with escaped single quotes
+        var escaped = uniqueNames.map(function(n) {
+          return "'" + n.replace(/'/g, "\\'") + "'";
+        });
+        var query = "SELECT * FROM Document WHERE ecm:parentId = '" + this.document.uid +
+          "' AND dc:title IN (" + escaped.join(', ') +
+          ") AND ecm:isVersion = 0 AND ecm:isProxy = 0 AND ecm:isTrashed = 0";
+
+        return this.$.nx.request().then(function(request) {
+          return request.path('/search/lang/NXQL/execute')
+            .queryParams({ query: query, pageSize: 0 })
+            .get();
+        }).then(function(response) {
+          if (response && response.resultsCount > 0) {
+            // Collect matching titles
+            var matchingTitles = [];
+            var titleSeen = {};
+            response.entries.forEach(function(entry) {
+              var title = entry.properties && entry.properties['dc:title'];
+              if (title && !titleSeen[title]) {
+                titleSeen[title] = true;
+                matchingTitles.push(title);
+              }
+            });
+            if (matchingTitles.length > 0) {
+              self._warningMessage = self.i18n('folderDrop.warning.duplicates',
+                matchingTitles.join(', '));
+            }
+          }
         });
       },
 

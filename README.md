@@ -44,7 +44,7 @@ Each completed phase shows a checkmark.
 
 Once the import completes, a success message is displayed. Clicking **Close** refreshes the current view to show the newly imported documents.
 
-## S3 Direct Upload
+### S3 Direct Upload
 
 When the [Nuxeo S3 Direct Upload](https://doc.nuxeo.com/nxdoc/amazon-s3-direct-upload/) addon is installed and configured (`s3.useDirectUpload=true`), the plugin automatically detects it and switches to an optimized upload mode:
 
@@ -55,6 +55,16 @@ When the [Nuxeo S3 Direct Upload](https://doc.nuxeo.com/nxdoc/amazon-s3-direct-u
 When S3 Direct Upload is **not** available, the plugin falls back to sequential uploads through the Nuxeo server with file-count progress, as described above.
 
 No additional configuration is needed — the plugin auto-detects the S3 provider at runtime.
+
+### Duplicate Handling
+
+After dropping items and before uploading, the plugin checks whether any of the **top-level** dropped items (folders or files) have the same title as existing children of the target document. If duplicates are found, an **informational warning** is displayed listing the matching names — for example:
+
+> *The following item(s) already exist at this location: Reports, data.csv. New documents will be created with the same title, which may appear as duplicates.*
+
+This is a **warning only** — the Upload button remains enabled and the user can choose to proceed. Nuxeo allows multiple documents with the same `dc:title` under the same parent; it creates a unique internal name (used in the URL path) for each new document. In the UI, the user will see what appears to be duplicate entries with the same title.
+
+Note: Only top-level items are checked. Sub-items (files and folders inside dropped folders) are created inside newly created folders, so there is no conflict with existing documents.
 
 ## Configuration
 
