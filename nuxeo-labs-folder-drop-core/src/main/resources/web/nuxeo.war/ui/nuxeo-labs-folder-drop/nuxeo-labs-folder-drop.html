@@ -82,16 +82,48 @@ Contributors:
       .tree-preview {
         max-height: 250px;
         overflow-y: auto;
-        font-family: monospace;
         font-size: 12px;
         background: var(--nuxeo-box, #fff);
         border: 1px solid var(--nuxeo-border, #e3e3e3);
         border-radius: 4px;
         padding: 8px 12px;
         margin: 8px 0;
-        white-space: pre;
         width: 100%;
         box-sizing: border-box;
+      }
+
+      .tree-line {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 0;
+      }
+
+      .tree-line iron-icon {
+        --iron-icon-height: 18px;
+        --iron-icon-width: 18px;
+        color: var(--nuxeo-text-light, #939caa);
+        flex-shrink: 0;
+      }
+
+      .tree-line-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .tree-line-size {
+        color: var(--nuxeo-text-light, #939caa);
+        white-space: nowrap;
+        margin-left: 4px;
+      }
+
+      .duplicate-icon {
+        --iron-icon-height: 16px;
+        --iron-icon-width: 16px;
+        color: yellow;
+        flex-shrink: 0;
+        margin-left: 4px;
       }
 
       .error-message {
@@ -111,8 +143,6 @@ Contributors:
         font-size: 13px;
         margin: 8px 0;
         padding: 8px 12px;
-        background: #fff3e0;
-        border: 1px solid #ffe0b2;
         border-radius: 4px;
       }
 
@@ -212,15 +242,29 @@ Contributors:
         <div class="summary">
           [[_treeSummary]]
         </div>
-        <div class="tree-preview">[[_treePreview]]</div>
+        <div class="tree-preview">
+          <template is="dom-repeat" items="[[_treeLines]]" as="line">
+            <div class="tree-line" style$="padding-left: [[_indent(line.depth)]]px;">
+              <iron-icon icon$="[[_lineIcon(line.isFolder)]]"></iron-icon>
+              <span class="tree-line-name">[[line.name]]</span>
+              <template is="dom-if" if="[[!line.isFolder]]">
+                <span class="tree-line-size">[[line.sizeLabel]]</span>
+              </template>
+              <template is="dom-if" if="[[line.isDuplicate]]">
+                ⚠️
+              </template>
+            </div>
+          </template>
+        </div>
       </template>
 
       <!-- Warning message (e.g., duplicate items) -->
       <template is="dom-if" if="[[_warningMessage]]">
         <div class="warning-message">
-          <div>[[_warningMessage]]</div>
+          <div>⚠️&nbsp;[[_warningMessage]]</div>
           <div>[[i18n('folderDrop.warning.duplicates.hint')]]</div>
         </div>
+        <hr>
       </template>
 
       <!-- Phase: Upload files (default / sequential mode) -->
@@ -338,9 +382,9 @@ Contributors:
           value: false
         },
 
-        _treePreview: {
-          type: String,
-          value: ''
+        _treeLines: {
+          type: Array,
+          value: function() { return []; }
         },
 
         _treeSummary: {
@@ -588,7 +632,7 @@ Contributors:
         this._items = [];
         this._fileObjects = [];
         this._hasTree = false;
-        this._treePreview = '';
+        this._treeLines = [];
         this._treeSummary = '';
         this._uploading = false;
         this._canUpload = false;
@@ -608,6 +652,7 @@ Contributors:
         this._importProgressMax = 100;
         this._errorMessage = '';
         this._warningMessage = '';
+        this._duplicateNames = {};
         this._successMessage = '';
         this._useS3 = false;
         this._inFlightFiles = [];
@@ -695,8 +740,6 @@ Contributors:
         this._readEntriesRecursively(entries).then(function(result) {
           self._items = result.items;
           self._fileObjects = result.files;
-          self._buildTreePreview();
-          self._hasTree = true;
 
           // Check limits
           var fileCount = result.files.length;
@@ -704,22 +747,30 @@ Contributors:
           result.files.forEach(function(f) { totalSize += f.size; });
 
           if (fileCount > self._maxFiles) {
+            self._buildTreePreview();
+            self._hasTree = true;
             self._errorMessage = self.i18n('folderDrop.error.tooManyFiles',
               fileCount.toString(), self._maxFiles.toString());
             return;
           }
           if (totalSize > self._maxTotalSizeInBytes) {
+            self._buildTreePreview();
+            self._hasTree = true;
             self._errorMessage = self.i18n('folderDrop.error.totalSizeTooLarge',
               self.formatSize(totalSize), self.formatSize(self._maxTotalSizeInBytes));
             return;
           }
 
-          // Check for duplicate titles at the target level
+          // Check for duplicate titles at the target level, then build tree preview
           self._checkDuplicates().then(function() {
+            self._buildTreePreview();
+            self._hasTree = true;
             self._canUpload = true;
           }).catch(function(err) {
             console.warn('[nuxeo-labs-folder-drop] Duplicate check failed:', err);
             // Don't block upload if the check fails — just skip the warning
+            self._buildTreePreview();
+            self._hasTree = true;
             self._canUpload = true;
           });
         }).catch(function(err) {
@@ -734,6 +785,7 @@ Contributors:
        */
       _checkDuplicates: function() {
         var self = this;
+        this._duplicateNames = {};
 
         // Collect names of top-level items (relativePath has no '/')
         var topLevelNames = [];
@@ -782,6 +834,8 @@ Contributors:
               }
             });
             if (matchingTitles.length > 0) {
+              // Store duplicate names for tree preview icons
+              matchingTitles.forEach(function(t) { self._duplicateNames[t] = true; });
               self._warningMessage = self.i18n('folderDrop.warning.duplicates',
                 matchingTitles.join(', '));
             }
@@ -891,11 +945,19 @@ Contributors:
         return readBatch();
       },
 
+      _lineIcon: function(isFolder) {
+        return isFolder ? 'icons:folder' : 'editor:insert-drive-file';
+      },
+
+      _indent: function(depth) {
+        return depth * 24;
+      },
+
       _buildTreePreview: function() {
         var folders = 0;
         var fileCount = 0;
         var totalSize = 0;
-        var lines = [];
+        var treeLines = [];
 
         // Sort items by relativePath for display
         var sorted = this._items.slice().sort(function(a, b) {
@@ -903,23 +965,33 @@ Contributors:
         });
 
         var self = this;
+        var duplicateNames = this._duplicateNames || {};
         sorted.forEach(function(item) {
           var depth = item.relativePath.split('/').length - 1;
-          var indent = '';
-          for (var i = 0; i < depth; i++) {
-            indent += '  ';
-          }
+          var isDuplicate = depth === 0 && !!duplicateNames[item.name];
           if (item.isFolder) {
-            lines.push(indent + '\uD83D\uDCC1 ' + item.name);
+            treeLines.push({
+              name: item.name,
+              isFolder: true,
+              isDuplicate: isDuplicate,
+              depth: depth,
+              sizeLabel: ''
+            });
             folders++;
           } else {
-            lines.push(indent + '\uD83D\uDCC4 ' + item.name + '  (' + self.formatSize(item.size) + ')');
+            treeLines.push({
+              name: item.name,
+              isFolder: false,
+              isDuplicate: isDuplicate,
+              depth: depth,
+              sizeLabel: '(' + self.formatSize(item.size) + ')'
+            });
             fileCount++;
             totalSize += item.size || 0;
           }
         });
 
-        this._treePreview = lines.join('\n');
+        this._treeLines = treeLines;
         this._treeSummary = this.i18n('folderDrop.summary',
           folders.toString(), fileCount.toString(), this.formatSize(totalSize));
       },
