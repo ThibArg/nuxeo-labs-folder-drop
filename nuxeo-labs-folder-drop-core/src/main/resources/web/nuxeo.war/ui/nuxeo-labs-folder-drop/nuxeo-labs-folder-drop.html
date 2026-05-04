@@ -251,12 +251,13 @@ Contributors:
           <template is="dom-repeat" items="[[_treeLines]]" as="line">
             <div class="tree-line" style$="padding-left: [[_indent(line.depth)]]px;">
               <iron-icon icon$="[[_lineIcon(line.isFolder)]]"></iron-icon>
-              <span class="tree-line-name">[[line.name]]</span>
+              <template is="dom-if" if="[[line.isDuplicate]]">
+                <san id="[[_duplicateLineId(line)]]">⚠️</san>
+                <nuxeo-tooltip for="[[_duplicateLineId(line)]]">[[i18n('folderDrop.warning.oneDuplicate')]]</nuxeo-tooltip>
+              </template>
+              <span class="tree-line-name" style="[[_lineNameStyle(line.isDuplicate)]]">[[line.name]]</span>
               <template is="dom-if" if="[[!line.isFolder]]">
                 <span class="tree-line-size">[[line.sizeLabel]]</span>
-              </template>
-              <template is="dom-if" if="[[line.isDuplicate]]">
-                ⚠️
               </template>
             </div>
           </template>
@@ -658,6 +659,7 @@ Contributors:
         this._errorMessage = '';
         this._warningMessage = '';
         this._duplicateNames = {};
+        this._duplicateLinesIds = {};
         this._successMessage = '';
         this._useS3 = false;
         this._inFlightFiles = [];
@@ -952,6 +954,25 @@ Contributors:
 
       _lineIcon: function(isFolder) {
         return isFolder ? 'icons:folder' : 'editor:insert-drive-file';
+      },
+
+      _lineNameStyle: function(isDuplicate) {
+        return isDuplicate ? 'font-style: italic;' : '';
+      },
+
+      _duplicateLineId: function(line) {
+        let key = line.name + (line.depth > 0 ? '-'.repeat(line.depth) : '') + line.sizeLabel;
+        if(!this._duplicateLinesIds) {
+          this._duplicateLinesIds = {};
+        }
+        
+        let id = this._duplicateLinesIds[key];
+        if(!id) {
+          // Must always start with a letter to be avlid querySelector
+          id = "a-" + crypto.randomUUID();
+          this._duplicateLinesIds[key] = id;
+        }
+        return id;
       },
 
       _indent: function(depth) {

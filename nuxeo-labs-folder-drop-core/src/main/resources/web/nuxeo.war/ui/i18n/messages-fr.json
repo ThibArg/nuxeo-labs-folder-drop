@@ -20,6 +20,7 @@
   "folderDrop.error.totalSizeTooLarge": "La taille totale ({0}) d\u00e9passe le maximum autoris\u00e9 ({1}).",
   "folderDrop.error.invalidConfig": "Configuration du d\u00e9p\u00f4t de dossier invalide. Veuillez contacter votre administrateur.",
   "folderDrop.progress.uploading.bytes": "Envoi des fichiers... ({0} / {1})",
+  "folderDrop.warning.oneDuplicate": "Ce document existe déjà à cet emplacement, voir l'avertissement ci-dessous.",
   "folderDrop.warning.duplicates": "Les \u00e9l\u00e9ments suivants existent d\u00e9j\u00e0 \u00e0 cet emplacement : {0}.",
   "folderDrop.warning.duplicates.hint": "De nouveaux documents seront cr\u00e9\u00e9s avec le m\u00eame titre, ce qui peut cr\u00e9er des doublons apparents."
 }

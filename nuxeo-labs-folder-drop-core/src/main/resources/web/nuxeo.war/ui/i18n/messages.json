@@ -20,6 +20,7 @@
   "folderDrop.error.totalSizeTooLarge": "Total size ({0}) exceeds the maximum allowed ({1}).",
   "folderDrop.error.invalidConfig": "Invalid folder drop configuration. Please contact your administrator.",
   "folderDrop.progress.uploading.bytes": "Uploading files... ({0} / {1})",
+  "folderDrop.warning.oneDuplicate": "This item already exists at this location, see the warning below.",
   "folderDrop.warning.duplicates": "The following item(s) already exist at this location: {0}.",
   "folderDrop.warning.duplicates.hint": "New documents will be created with the same title, which may appear as duplicates."
 }
