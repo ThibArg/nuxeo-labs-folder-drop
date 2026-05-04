@@ -292,7 +292,7 @@ Contributors:
     Polymer({
       is: 'nuxeo-labs-folder-drop',
 
-      behaviors: [Nuxeo.I18nBehavior],
+      behaviors: [Nuxeo.FormatBehavior],
 
       properties: {
         /** The current Folderish document */
@@ -685,7 +685,7 @@ Contributors:
           }
           if (totalSize > self._maxTotalSizeInBytes) {
             self._errorMessage = self.i18n('folderDrop.error.totalSizeTooLarge',
-              self._formatSize(totalSize), self._formatSize(self._maxTotalSizeInBytes));
+              self.formatSize(totalSize), self.formatSize(self._maxTotalSizeInBytes));
             return;
           }
 
@@ -798,18 +798,6 @@ Contributors:
         return readBatch();
       },
 
-      /**
-       * Format a byte count into a human-readable string.
-       */
-      _formatSize: function(bytes) {
-        if (bytes === 0) return '0 B';
-        var units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        var i = Math.floor(Math.log(bytes) / Math.log(1024));
-        if (i >= units.length) i = units.length - 1;
-        var value = bytes / Math.pow(1024, i);
-        return value.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
-      },
-
       _buildTreePreview: function() {
         var folders = 0;
         var fileCount = 0;
@@ -832,7 +820,7 @@ Contributors:
             lines.push(indent + '\uD83D\uDCC1 ' + item.name);
             folders++;
           } else {
-            lines.push(indent + '\uD83D\uDCC4 ' + item.name + '  (' + self._formatSize(item.size) + ')');
+            lines.push(indent + '\uD83D\uDCC4 ' + item.name + '  (' + self.formatSize(item.size) + ')');
             fileCount++;
             totalSize += item.size || 0;
           }
@@ -840,7 +828,7 @@ Contributors:
 
         this._treePreview = lines.join('\n');
         this._treeSummary = this.i18n('folderDrop.summary',
-          folders.toString(), fileCount.toString(), this._formatSize(totalSize));
+          folders.toString(), fileCount.toString(), this.formatSize(totalSize));
       },
 
       /**
@@ -961,7 +949,7 @@ Contributors:
           files.forEach(function(file, index) {
             chain = chain.then(function() {
               self._currentFileName = file.name;
-              self._currentFileSize = self._formatSize(file.size);
+              self._currentFileSize = self.formatSize(file.size);
               self._showFileIndeterminate = file.size > LARGE_FILE_THRESHOLD;
 
               var blob = new Nuxeo.Blob({ content: file });
@@ -1007,7 +995,7 @@ Contributors:
         this._uploadProgressValue = 0;
         this._uploadProgressMax = totalBytes || 1;
         this._uploadProgressLabel = this.i18n('folderDrop.progress.uploading.bytes',
-          '0', this._formatSize(totalBytes));
+          '0', this.formatSize(totalBytes));
         this._hasInFlightFiles = true;
         this._inFlightFiles = [];
 
@@ -1100,7 +1088,7 @@ Contributors:
         list.push({
           idx: idx,
           name: file.name,
-          sizeLabel: this._formatSize(file.size),
+          sizeLabel: this.formatSize(file.size),
           pct: 0
         });
         this._inFlightFiles = list;
@@ -1134,7 +1122,7 @@ Contributors:
         this._uploadedBytes = totalLoaded;
         this._uploadProgressValue = totalLoaded;
         this._uploadProgressLabel = this.i18n('folderDrop.progress.uploading.bytes',
-          this._formatSize(totalLoaded), this._formatSize(this._totalBytes));
+          this.formatSize(totalLoaded), this.formatSize(this._totalBytes));
       },
 
       _updateS3AggregateProgress: function(perFileLoaded, totalBytes, completedCount, totalFiles) {
@@ -1145,7 +1133,7 @@ Contributors:
         this._uploadedBytes = totalLoaded;
         this._uploadProgressValue = totalLoaded;
         this._uploadProgressLabel = this.i18n('folderDrop.progress.uploading.bytes',
-          this._formatSize(totalLoaded), this._formatSize(totalBytes));
+          this.formatSize(totalLoaded), this.formatSize(totalBytes));
       },
 
       /**
