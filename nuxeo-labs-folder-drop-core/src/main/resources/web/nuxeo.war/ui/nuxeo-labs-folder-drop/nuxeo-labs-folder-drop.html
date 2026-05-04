@@ -28,6 +28,8 @@ Contributors:
         --nuxeo-dialog: {
           top: 50px;
           bottom: auto;
+          width: 50%;
+          max-width: 700px;
         };
       }
 
@@ -177,6 +179,7 @@ Contributors:
 
     <!-- The action button -->
     <paper-icon-button id="dropFolderBtn" icon="icons:folder" on-tap="_openDialog" noink></paper-icon-button>
+    <span class="label" hidden$="[[!showLabel]]">[[i18n('folderDrop.action.tooltip')]]</span>
     <nuxeo-tooltip for="dropFolderBtn">[[i18n('folderDrop.action.tooltip')]]</nuxeo-tooltip>
 
     <!-- The dialog -->
@@ -294,6 +297,11 @@ Contributors:
       properties: {
         /** The current Folderish document */
         document: Object,
+
+        showLabel: {
+          type: Boolean,
+          value: false
+        },
 
         /** Flat list of all items in the tree */
         _items: {
@@ -665,7 +673,7 @@ Contributors:
               return;
             }
             // Reject entry names containing path traversal sequences
-            if (entry.name.indexOf('..') !== -1 || entry.name.indexOf('/') !== -1 || entry.name.indexOf('\\') !== -1) {
+            if (entry.name === '..' || entry.name.indexOf('/') !== -1 || entry.name.indexOf('\\') !== -1) {
               reject(new Error('Invalid entry name: ' + entry.name));
               return;
             }
