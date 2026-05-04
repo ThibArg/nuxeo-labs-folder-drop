@@ -829,8 +829,8 @@ Contributors:
        * Deletes a batch to clean up uploaded files on error.
        */
       _deleteBatch: function(batchId) {
-        this.$.nx.connect().then(function(client) {
-          client.request('/upload/' + batchId)
+        this.$.nx.request().then(function(request) {
+          request.path('/upload/' + batchId)
             .delete()
             .catch(function(e) {
               console.warn('[nuxeo-labs-folder-drop] Failed to clean up batch:', e);
@@ -886,9 +886,7 @@ Contributors:
         this._uploadProgressMax = totalFiles;
         this._uploadProgressLabel = this.i18n('folderDrop.progress.uploading.count', '0', totalFiles.toString());
 
-        return this.$.nx.connect().then(function(client) {
-          return client.batchUpload();
-        }).then(function(uploader) {
+        return this.$.nx.batchUpload().then(function(uploader) {
           self._uploader = uploader;
           var batchId = null;
 
@@ -953,9 +951,7 @@ Contributors:
         var perFileLoaded = new Array(totalFiles);
         for (var i = 0; i < totalFiles; i++) { perFileLoaded[i] = 0; }
 
-        return this.$.nx.connect().then(function(client) {
-          return client.batchUpload();
-        }).then(function(uploader) {
+        return this.$.nx.batchUpload().then(function(uploader) {
           self._uploader = uploader;
           var batchId = null;
           var completedCount = 0;
@@ -1162,8 +1158,8 @@ Contributors:
             var docType = folder.docType || 'Folder';
             var name = folder.name;
 
-            return self.$.nx.connect().then(function(client) {
-              return client.request('/path' + folderParentPath)
+            return self.$.nx.request().then(function(request) {
+              return request.path('/path' + folderParentPath)
                 .post({
                   body: {
                     'entity-type': 'document',
@@ -1215,8 +1211,8 @@ Contributors:
             var promise;
             if (file.docType) {
               // Explicit creation with specified doc type
-              promise = self.$.nx.connect().then(function(client) {
-                return client.request('/path' + fileParentPath)
+              promise = self.$.nx.request().then(function(request) {
+                return request.path('/path' + fileParentPath)
                   .post({
                     body: {
                       'entity-type': 'document',
@@ -1237,8 +1233,8 @@ Contributors:
               });
             } else {
               // Use FileManager.Import (default)
-              promise = self.$.nx.connect().then(function(client) {
-                return client.request('/upload/' + batchId + '/' + fileIdx + '/execute/FileManager.Import')
+              promise = self.$.nx.request().then(function(request) {
+                return request.path('/upload/' + batchId + '/' + fileIdx + '/execute/FileManager.Import')
                   .post({
                     body: {
                       params: {
