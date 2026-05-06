@@ -22,16 +22,18 @@ The plugin adds a **"Drop Folder..."** button on every Folderish document in Nux
 
 Navigate to any Folderish document (Workspace, Folder, etc.) and click the **folder icon** button in the document actions toolbar.
 
-<!-- ![Drop Folder Button](README-Images/01-button.png) -->
-
 ### 2. Drop Folders
 
-Drag one or more folders from your desktop into the drop zone. The plugin reads the full tree recursively and displays:
+Drag one or more folders from your desktop into the drop zone...
+
+![Drop Folder(s)](README-Images/01-Drop.png)
+
+...the plugin reads the full tree recursively and displays:
 
 - A **tree preview** showing the folder/file hierarchy
 - A **summary** with the number of folders, files, and total size (e.g., "3 folder(s), 12 file(s), 45.2 MB")
 
-<!-- ![Tree Preview](README-Images/02-tree-preview.png) -->
+![Check preview](README-Images/02-CheckAndUpload.png)
 
 ### 3. Upload
 
