@@ -26,14 +26,14 @@ Navigate to any Folderish document (Workspace, Folder, etc.) and click the **fol
 
 Drag one or more folders from your desktop into the drop zone...
 
-![Drop Folder(s)](README-Images/01-Drop.png)
+<img src="README-Images/01-Drop.png" alt="Drop Folder(s)" width="400">
 
 ...the plugin reads the full tree recursively and displays:
 
 - A **tree preview** showing the folder/file hierarchy
 - A **summary** with the number of folders, files, and total size (e.g., "3 folder(s), 12 file(s), 45.2 MB")
 
-![Check preview](README-Images/02-CheckAndUpload.png)
+<img src="README-Images/02-CheckAndUpload.png" alt="Check preview" width="400">
 
 ### 3. Upload
 
@@ -45,11 +45,22 @@ Click **Upload** to start the import. The dialog shows progress through each pha
 
 Each completed phase shows a checkmark.
 
-<!-- ![Upload Progress](README-Images/03-progress.png) -->
+<img src="README-Images/03-UploadRunning.png" alt="Upload Running" width="500">
 
 ### 4. Done
 
 Once the import completes, a success message is displayed. Clicking **Close** refreshes the current view to show the newly imported documents.
+
+<img src="README-Images/05-Result.png" alt="Upload Done" width="500">
+
+### 5. Cannot Upload
+
+See below: The plugin has configurable guardrails (nomber of files, total size). If the dropped element(s) reach one of these, the upload cannot be done and a message states the reason:
+
+<img src="README-Images/06-TooBig.png" alt="Too big" width="400">
+
+<img src="README-Images/07-TooManyFiles.png" alt="Too many files" width="400">
+
 
 ### S3 Direct Upload
 
