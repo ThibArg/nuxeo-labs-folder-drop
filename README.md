@@ -1,5 +1,8 @@
 # nuxeo-labs-folder-drop
 
+> [!CAUTION]
+> This repo has been forked to https://github.com/nuxeo-sandbox/nuxeo-labs-folder-drop and the code will not be maintained in ThibArg's repositories.
+
 ## TL;DR
 
 Drag-and-drop folder import for Nuxeo Web UI (LTS 2025). Drop folders from your desktop onto any Folderish document to create the full hierarchy in Nuxeo. Supports S3 direct upload, configurable file filtering, custom document type resolution via callback chain, and a server-side event on completion.
