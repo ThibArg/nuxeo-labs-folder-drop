@@ -47,3 +47,23 @@ This would require the client to collect all document UUIDs during creation (som
 The two upload elements (`nuxeo-labs-folder-drop` and `nuxeo-labs-folder-drop-s3`) duplicate ~60 lines of identical dialog HTML (drop zone, tree preview, warnings, progress phases, messages, buttons). A shared `nuxeo-labs-folder-drop-dialog` element could own this markup and all associated properties, with each outer element reduced to just the action button and its `_uploadFiles()` implementation. This would eliminate the risk of changing the dialog UI in one element and forgetting the other.
 
 However, this adds significant complexity: property forwarding or event wiring between parent and child elements, Polymer 2 slot/binding constraints, and harder debugging. Given the duplication is purely declarative HTML with no logic, the trade-off may not be worthwhile unless a third upload variant is added.
+
+## Validation Callback Chain (Whole-Tree)
+
+The existing per-item callback chain (`callbackChain`) resolves document types one item at a time, with no visibility into the overall tree. A second, optional callback chain could run **after** type resolution but **before** the result is returned to the front-end, receiving the entire resolved tree as input.
+
+**Purpose:** Apply business rules that require whole-tree context — e.g., reject imports exceeding a file count or total size, enforce naming conventions across the tree, require certain file types to be present, or validate folder depth.
+
+**Server-side contract:**
+- **Input**: the parent document (DocumentModel)
+- **Parameters**: `treeJson` (String) — the full resolved tree JSON (with `docType` already populated)
+- **On accept**: return the tree unchanged (or don't set any result variable)
+- **On reject**: set context variable `FolderDrop_ValidationResult` = JSON string `{"rejected": true, "message": "Reason for rejection"}`
+
+**Implementation:**
+- New optional configuration element in the extension point: `<validationChain>myValidationChainId</validationChain>`
+- Called in `FolderDropServiceImpl.resolveTypes()`, after `resolveDefaults()` or `resolveWithCallback()`, before returning
+- If rejected, the operation returns the rejection message instead of the resolved tree
+- Front-end change: `_resolveTypes` checks for a rejection response and displays the message as an error, aborting the import
+
+**Trade-offs:** Adds a new extension point and contract to document/maintain. The per-item callback chain could partially cover some validation cases (by returning an error-like docType), but cannot handle cross-item rules. Worth implementing only if whole-tree validation is a real requirement.
