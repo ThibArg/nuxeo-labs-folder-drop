@@ -137,6 +137,11 @@ Contributors:
         value: 100
       },
 
+      _currentItemInfo: {
+        type: String,
+        value: ''
+      },
+
       _errorMessage: {
         type: String,
         value: ''
@@ -274,6 +279,7 @@ Contributors:
       this._importProgressLabel = '';
       this._importProgressValue = 0;
       this._importProgressMax = 100;
+      this._currentItemInfo = '';
       this._errorMessage = '';
       this._warningMessage = '';
       this._duplicateNames = {};
@@ -831,6 +837,7 @@ Contributors:
       folders.forEach(function(folder) {
         chain = chain.then(function() {
           self._currentItemPath = folder.relativePath;
+          self._currentItemInfo = folder.name;
           var parentRelPath = self._getParentRelativePath(folder.relativePath);
           var parentId = pathToId[parentRelPath];
           var docType = folder.docType || 'Folder';
@@ -885,6 +892,7 @@ Contributors:
       files.forEach(function(file) {
         chain = chain.then(function() {
           self._currentItemPath = file.relativePath;
+          self._currentItemInfo = file.name + ' (' + self.formatSize(file.size) + ')';
           var parentRelPath = self._getParentRelativePath(file.relativePath);
           var parentId = pathToId[parentRelPath];
           var fileIdx = file.batchFileIndex !== undefined ? file.batchFileIndex : '0';
