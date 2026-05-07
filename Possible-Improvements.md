@@ -41,3 +41,9 @@ Currently, when dropped items have the same title as existing children of the ta
 The `folderDropImportDone` event currently provides counts and the parent document ID. A future version could enrich the event context with the UUIDs of all created documents, allowing listeners to act on the exact documents that were imported (e.g., start a workflow, apply metadata, trigger processing).
 
 This would require the client to collect all document UUIDs during creation (some are already tracked in the `pathToId` map for folders) and pass them back to the `FolderDrop.NotifyDone` operation as an additional parameter.
+
+## Shared Dialog Element
+
+The two upload elements (`nuxeo-labs-folder-drop` and `nuxeo-labs-folder-drop-s3`) duplicate ~60 lines of identical dialog HTML (drop zone, tree preview, warnings, progress phases, messages, buttons). A shared `nuxeo-labs-folder-drop-dialog` element could own this markup and all associated properties, with each outer element reduced to just the action button and its `_uploadFiles()` implementation. This would eliminate the risk of changing the dialog UI in one element and forgetting the other.
+
+However, this adds significant complexity: property forwarding or event wiring between parent and child elements, Polymer 2 slot/binding constraints, and harder debugging. Given the duplication is purely declarative HTML with no logic, the trade-off may not be worthwhile unless a third upload variant is added.
