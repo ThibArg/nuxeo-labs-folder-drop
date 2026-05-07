@@ -17,18 +17,25 @@ Contributors:
     Thibaud Arguillere
 -->
 
-<!-- Import the component -->
+<!-- Import the components -->
 <link rel="import" href="nuxeo-labs-folder-drop.html">
+<link rel="import" href="nuxeo-labs-folder-drop-s3.html">
 
 <!--
   Register the "Drop Folder..." button in document actions.
   Only visible on Folderish documents.
+
+  By default, only the standard element is displayed (uses server-side upload).
+  To use S3 direct upload instead, override this contribution in Nuxeo Studio:
+    - Remove "display" from nuxeo-labs-folder-drop
+    - Add "display" to nuxeo-labs-folder-drop-s3
 -->
 <nuxeo-slot-content name="folderDropAction" slot="DOCUMENT_ACTIONS" order="40">
   <template>
     <nuxeo-filter document="[[document]]" facet="Folderish">
       <template>
-        <nuxeo-labs-folder-drop document="[[document]]"></nuxeo-labs-folder-drop>
+        <nuxeo-labs-folder-drop document="[[document]]" display></nuxeo-labs-folder-drop>
+        <nuxeo-labs-folder-drop-s3 document="[[document]]"></nuxeo-labs-folder-drop-s3>
       </template>
     </nuxeo-filter>
   </template>

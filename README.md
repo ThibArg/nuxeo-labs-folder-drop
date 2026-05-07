@@ -64,15 +64,30 @@ See below: The plugin has configurable guardrails (nomber of files, total size).
 
 ### S3 Direct Upload
 
-When the [Nuxeo S3 Direct Upload](https://doc.nuxeo.com/nxdoc/amazon-s3-direct-upload/) addon is installed and configured (`s3.useDirectUpload=true`), the plugin automatically detects it and switches to an optimized upload mode:
+When the [Nuxeo S3 Direct Upload](https://doc.nuxeo.com/nxdoc/amazon-s3-direct-upload/) addon is installed and configured (`s3.useDirectUpload=true`), the plugin provides an alternative element optimized for S3:
 
-- **Parallel uploads** — Up to 5 files upload simultaneously directly to S3, bypassing the Nuxeo server for the actual data transfer
+- **Parallel uploads** — Files upload simultaneously directly to S3, bypassing the Nuxeo server for the actual data transfer
 - **Real progress tracking** — An aggregate bytes-based progress bar (e.g., "Uploading files... (12.5 MB / 45.2 MB)") replaces the file-count progress bar
 - **Per-file progress** — A scrollable list below the aggregate bar shows each in-flight file with its own percentage progress bar
 
-When S3 Direct Upload is **not** available, the plugin falls back to sequential uploads through the Nuxeo server with file-count progress, as described above.
+#### Enabling the S3 Element
 
-No additional configuration is needed — the plugin auto-detects the S3 provider at runtime.
+The plugin ships two upload elements. By default, the standard element (`nuxeo-labs-folder-drop`) is active. To switch to the S3-optimized element (`nuxeo-labs-folder-drop-s3`), override the slot contribution in your Nuxeo Studio project:
+
+```html
+<nuxeo-slot-content name="folderDropAction" slot="DOCUMENT_ACTIONS" order="40">
+  <template>
+    <nuxeo-filter document="[[document]]" facet="Folderish">
+      <template>
+        <nuxeo-labs-folder-drop-s3 document="[[document]]" display></nuxeo-labs-folder-drop-s3>
+      </template>
+    </nuxeo-filter>
+  </template>
+</nuxeo-slot-content>
+```
+
+> [!IMPORTANT]
+> The `display` attribute **must** be present on the element you want active, and **absent** on the one you want hidden. Never use `display="false"` — in Polymer 2, attribute presence = true, absence = false.
 
 ### Duplicate Handling
 
