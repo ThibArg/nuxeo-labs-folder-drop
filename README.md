@@ -53,9 +53,9 @@ Once the import completes, a success message is displayed. Clicking **Close** re
 
 <img src="README-Images/05-Result.png" alt="Upload Done" width="500">
 
-### 5. Cannot Upload
+### 5. Guardrails
 
-See below: The plugin has configurable guardrails (nomber of files, total size). If the dropped element(s) reach one of these, the upload cannot be done and a message states the reason:
+See below: The plugin has configurable guardrails (number of files, total size). If the dropped element(s) reach one of these, the upload cannot be done and a message states the reason:
 
 <img src="README-Images/06-TooBig.png" alt="Too big" width="400">
 
@@ -72,7 +72,7 @@ When the [Nuxeo S3 Direct Upload](https://doc.nuxeo.com/nxdoc/amazon-s3-direct-u
 
 #### Enabling the S3 Element
 
-The plugin ships two upload elements. By default, the standard element (`nuxeo-labs-folder-drop`) is active. To switch to the S3-optimized element (`nuxeo-labs-folder-drop-s3`), override the slot contribution in your Nuxeo Studio project:
+The plugin ships two upload elements. By default, the standard element (`nuxeo-labs-folder-drop`) is active. To switch to the S3-optimized element (`nuxeo-labs-folder-drop-s3`), override the slot contribution in your Nuxeo Studio project (in Designer, in the custom bundle):
 
 ```html
 <nuxeo-slot-content name="folderDropAction" slot="DOCUMENT_ACTIONS" order="40">
@@ -114,7 +114,7 @@ What is easy and recommended is to customize the **slot contribution** that cont
   <template>
     <nuxeo-filter document="[[document]]" facet="Folderish">
       <template>
-        <nuxeo-labs-folder-drop document="[[document]]"></nuxeo-labs-folder-drop>
+        <nuxeo-labs-folder-drop document="[[document]]" display></nuxeo-labs-folder-drop>
       </template>
     </nuxeo-filter>
   </template>
