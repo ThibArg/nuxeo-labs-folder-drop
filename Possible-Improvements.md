@@ -67,3 +67,34 @@ The existing per-item callback chain (`callbackChain`) resolves document types o
 - Front-end change: `_resolveTypes` checks for a rejection response and displays the message as an error, aborting the import
 
 **Trade-offs:** Adds a new extension point and contract to document/maintain. The per-item callback chain could partially cover some validation cases (by returning an error-like docType), but cannot handle cross-item rules. Worth implementing only if whole-tree validation is a real requirement.
+
+## Inline Drop Zone Element
+
+Add a lightweight `nuxeo-labs-folder-drop-zone` element that provides a small, always-visible drop target the user can place anywhere in a Folderish document layout. On drop, it delegates to the existing upload element, which opens its dialog with tree preview, progress, and the full import flow.
+
+**Approach — reuse, not duplication:**
+
+Rather than duplicating upload/dialog logic, the existing elements (`nuxeo-labs-folder-drop` / `nuxeo-labs-folder-drop-s3`) gain two small additions:
+
+1. **`noButton` property** (Boolean, default `false`) — when `true`, hides the action button. The element sits invisible, waiting to be triggered externally.
+2. **`dropEntries(entries)` public method** — receives an array of `FileSystemEntry` objects and runs the full flow (tree reading, validation, dialog display, upload, import). The existing `_onDrop` handler is refactored into a thin wrapper: it extracts entries from `e.dataTransfer.items`, then calls `this.dropEntries(entries)`. This refactoring lives in `FolderDropCommonBehavior`, so both elements get it automatically.
+
+**The zone element itself** is minimal (~30-40 lines of template + logic):
+- A small styled strip/card ("Drop folders here" + icon) with drag-over highlight
+- A `target` property referencing the upload element
+- On drop: extract entries from `e.dataTransfer.items`, call `this.target.dropEntries(entries)`
+- No behavior mixin, no dialog, no upload logic
+
+**Usage in a custom layout (Studio Designer):**
+```html
+<nuxeo-labs-folder-drop id="folderDrop" no-button display document="[[document]]">
+</nuxeo-labs-folder-drop>
+<nuxeo-labs-folder-drop-zone target="[[$.folderDrop]]">
+</nuxeo-labs-folder-drop-zone>
+```
+
+For S3, the user simply swaps `nuxeo-labs-folder-drop` for `nuxeo-labs-folder-drop-s3`. The zone element stays the same.
+
+**Backward compatibility:** `noButton` defaults to `false`, and `dropEntries()` is just an unused method if the zone is never loaded. Existing behavior is 100% unchanged.
+
+**No server-side changes required.**
