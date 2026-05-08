@@ -22,5 +22,16 @@
   "folderDrop.progress.uploading.bytes": "Uploading files... ({0} / {1})",
   "folderDrop.warning.oneDuplicate": "This item already exists at this location, see the warning below.",
   "folderDrop.warning.duplicates": "The following item(s) already exist at this location: {0}.",
-  "folderDrop.warning.duplicates.hint": "New documents will be created with the same title, which may appear as duplicates."
+  "folderDrop.warning.duplicates.hint": "New documents will be created with the same title, which may appear as duplicates.",
+  "folderDrop.dialog.stopUpload": "Stop upload",
+  "folderDrop.dialog.stopping": "Stopping after the current item finishes...",
+  "folderDrop.dialog.confirmStop.title": "Stop upload?",
+  "folderDrop.dialog.confirmStop.bodyUpload": "Files are still being uploaded. No document has been created yet. Continue stopping?",
+  "folderDrop.dialog.confirmStop.bodyImport": "{0} document(s) have already been created at this location. By default they will remain in the system. Choose how to stop:",
+  "folderDrop.dialog.confirmStop.resume": "Resume upload",
+  "folderDrop.dialog.confirmStop.cancelUpload": "Cancel upload",
+  "folderDrop.dialog.confirmStop.stopKeep": "Stop and keep imported items",
+  "folderDrop.dialog.confirmStop.stopDelete": "Stop and permanently delete imported items",
+  "folderDrop.dialog.confirmStop.deleting": "Deleting imported item(s)...",
+  "folderDrop.stopped": "Upload stopped. {0} document(s) were created at this location."
 }

@@ -190,6 +190,37 @@ Contributors:
       _denyPatterns: {
         type: Array,
         value: function() { return []; }
+      },
+
+      // --- Stop / cancel ---
+      /** True between Stop click and confirmation/resume */
+      _stopRequested: {
+        type: Boolean,
+        value: false
+      },
+
+      /** Show the inline "Stopping after current item..." hint */
+      _showStoppingHint: {
+        type: Boolean,
+        value: false
+      },
+
+      /** Show the confirmation modal */
+      _showStopConfirm: {
+        type: Boolean,
+        value: false
+      },
+
+      /** True while the rollback REST call is in flight (modal stays open with a spinner). */
+      _rollingBack: {
+        type: Boolean,
+        value: false
+      },
+
+      /** Final neutral message after a confirmed stop */
+      _stoppedMessage: {
+        type: String,
+        value: ''
       }
     },
 
@@ -256,8 +287,167 @@ Contributors:
         // Refresh the current view after successful import
         this.fire('document-updated');
         this.fire('navigate', { doc: this.document });
+      } else if (this._stoppedMessage && this._createdCount > 0) {
+        // After a confirmed stop, refresh so the user sees the partial result.
+        this.fire('document-updated');
+        this.fire('navigate', { doc: this.document });
       }
       this.$.dialog.toggle();
+    },
+
+    /**
+     * Closes the stop-confirm modal and the main dialog after a confirmed stop.
+     * If keptDocsRemain is true (Stop and keep with at least one document created),
+     * also fires document-updated/navigate so the parent view refreshes.
+     */
+    _finishStopAndClose: function(keptDocsRemain) {
+      this._showStopConfirm = false;
+      this._rollingBack = false;
+      this._stoppedMessage = '';
+      if (keptDocsRemain) {
+        this.fire('document-updated');
+        this.fire('navigate', { doc: this.document });
+      }
+      if (this.$.dialog && this.$.dialog.opened) {
+        this.$.dialog.close();
+      }
+    },
+
+    /* ===================================================================
+     * Stop / cancel
+     * =================================================================== */
+
+    /**
+     * Sentinel used to short-circuit the upload chain when the user confirms Stop.
+     * Detected in _startUpload's catch and treated as a non-error abort.
+     */
+    _STOP_SENTINEL: '__FOLDER_DROP_STOP__',
+
+    /** Click handler for the Stop button. Pauses (sets the flag) and shows the confirm modal. */
+    _onStopClicked: function() {
+      if (!this._uploading || this._stopRequested) {
+        return;
+      }
+      this._stopRequested = true;
+      this._showStoppingHint = true;
+      this._showStopConfirm = true;
+    },
+
+    /**
+     * Returns a Promise that resolves immediately if no stop was requested,
+     * otherwise waits for the user's choice in the confirmation modal:
+     *   - Resume  -> resolves
+     *   - Stop    -> rejects with the STOP sentinel (with optional rollback flag)
+     * Insert one call at the start of every per-item async step.
+     */
+    _awaitResume: function() {
+      if (!this._stopRequested) {
+        return Promise.resolve();
+      }
+      var self = this;
+      // Modal is already shown by _onStopClicked; just wait for the user.
+      return new Promise(function(resolve, reject) {
+        self._stopResolve = resolve;
+        self._stopReject = reject;
+      });
+    },
+
+    /** Confirm modal: user chose to resume. */
+    _onConfirmStopResume: function() {
+      this._showStopConfirm = false;
+      this._showStoppingHint = false;
+      this._stopRequested = false;
+      var resolve = this._stopResolve;
+      this._stopResolve = null;
+      this._stopReject = null;
+      if (resolve) {
+        resolve();
+      }
+    },
+
+    /** Confirm modal: user chose to stop and KEEP whatever was already created. */
+    _onConfirmStopKeep: function() {
+      this._showStopConfirm = false;
+      this._stopShouldRollback = false;
+      var reject = this._stopReject;
+      this._stopResolve = null;
+      this._stopReject = null;
+      if (reject) {
+        reject(new Error(this._STOP_SENTINEL));
+      }
+    },
+
+    /**
+     * Confirm modal: user chose to stop AND permanently delete what was created so far.
+     * Top-level UUIDs are sent to FolderDrop.RollbackImport which hard-deletes them
+     * (NOT trash). Nuxeo cascades to children automatically.
+     */
+    _onConfirmStopDelete: function() {
+      // Keep the modal open and switch it to a "deleting..." indeterminate state.
+      // _rollingBack is cleared by _rollbackImport() when the server call completes.
+      this._rollingBack = true;
+      this._stopShouldRollback = true;
+      var reject = this._stopReject;
+      this._stopResolve = null;
+      this._stopReject = null;
+      if (reject) {
+        reject(new Error(this._STOP_SENTINEL));
+      }
+    },
+
+    /**
+     * Calls FolderDrop.RollbackImport with the top-level created UUIDs.
+     * Returns a Promise that always resolves (rollback failures are logged, not raised
+     * to the user, since the user already chose to stop).
+     */
+    _rollbackImport: function() {
+      var self = this;
+      var ids = (this._topLevelCreatedIds || []).filter(Boolean);
+      if (ids.length === 0) {
+        self._rollingBack = false;
+        self._showStopConfirm = false;
+        return Promise.resolve();
+      }
+      var op = this.$.rollbackImportOp;
+      op.params = {
+        parentId: this.document.uid,
+        ids: ids.join(',')
+      };
+      op.input = undefined;
+      self._rollingBack = true;
+      return op.execute().catch(function(err) {
+        console.warn('[nuxeo-labs-folder-drop] Rollback failed:', err);
+      }).then(function() {
+        self._rollingBack = false;
+        self._showStopConfirm = false;
+      });
+    },
+
+    /** True while Stop is allowed (used by the templates). */
+    _showStopButton: function(_uploading, _stopRequested) {
+      return _uploading;
+    },
+
+    /** Body text for the confirmation modal. */
+    _stopConfirmBody: function(_createdCount) {
+      var n = this._createdCount || 0;
+      if (n > 0) {
+        return this.i18n('folderDrop.dialog.confirmStop.bodyImport', n.toString());
+      }
+      return this.i18n('folderDrop.dialog.confirmStop.bodyUpload');
+    },
+
+    /** Whether to show the "delete what was created" button (only if anything was created). */
+    _canRollback: function(_createdCount) {
+      return (this._createdCount || 0) > 0;
+    },
+
+    /** Label for the "stop and keep" button: differs depending on whether any document was created. */
+    _stopKeepLabel: function(_createdCount) {
+      if ((this._createdCount || 0) > 0) {
+        return this.i18n('folderDrop.dialog.confirmStop.stopKeep');
+      }
+      return this.i18n('folderDrop.dialog.confirmStop.cancelUpload');
     },
 
     _reset: function() {
@@ -291,6 +481,14 @@ Contributors:
       this._filterHiddenFiles = true;
       this._denyPatterns = [];
       this._batchId = null;
+      this._stopRequested = false;
+      this._showStoppingHint = false;
+      this._showStopConfirm = false;
+      this._rollingBack = false;
+      this._stoppedMessage = '';
+      this._stopResolve = null;
+      this._stopReject = null;
+      this._topLevelCreatedIds = [];
       // Allow concrete elements to add their own reset logic
       if (typeof this._resetUploader === 'function') {
         this._resetUploader();
@@ -489,9 +687,11 @@ Contributors:
         "' AND dc:title IN (" + escaped.join(', ') +
         ") AND ecm:isVersion = 0 AND ecm:isProxy = 0 AND ecm:isTrashed = 0";
 
+      // pageSize: 40 — we only need to know if duplicates exist; a small sample
+      // is enough to display in the warning, no need to fetch the full result set.
       return this.$.nx.request().then(function(request) {
         return request.path('/search/execute')
-          .queryParams({ query: query, pageSize: 0 })
+          .queryParams({ query: query, pageSize: 40 })
           .get();
       }).then(function(response) {
         if (response && response.resultsCount > 0) {
@@ -675,6 +875,13 @@ Contributors:
       this._batchId = null;
       this._createdCount = 0;
       this._currentItemPath = '';
+      this._topLevelCreatedIds = [];
+      this._stopRequested = false;
+      this._showStoppingHint = false;
+      this._showStopConfirm = false;
+      this._stoppedMessage = '';
+      this._stopShouldRollback = false;
+      this._rollingBack = false;
 
       var self = this;
 
@@ -721,11 +928,36 @@ Contributors:
           self._deleteBatch(self._batchId);
         }
       }).catch(function(err) {
-        console.error('[nuxeo-labs-folder-drop] Import failed:', err);
+        var isStop = err && err.message === self._STOP_SENTINEL;
+        if (!isStop) {
+          console.error('[nuxeo-labs-folder-drop] Import failed:', err);
+        }
         self._showUploadProgress = false;
         self._showResolvingProgress = false;
         self._showImportProgress = false;
         self._uploading = false;
+        self._showStoppingHint = false;
+
+        if (isStop) {
+          // User-confirmed stop. Optionally roll back, then clean up the batch and notify.
+          var rollbackPromise = self._stopShouldRollback ? self._rollbackImport() : Promise.resolve();
+          rollbackPromise.then(function() {
+            var rolledBack = self._stopShouldRollback;
+            if (rolledBack) {
+              self._createdCount = 0;
+            }
+            var keptCount = self._createdCount || 0;
+            self._notifyDone('aborted', null, rolledBack ? 'rolled-back' : 'kept');
+            if (self._batchId) {
+              self._deleteBatch(self._batchId);
+            }
+            // Surface a brief toast then close everything (confirm modal + main dialog).
+            self.fire('notify', { message: self.i18n('folderDrop.stopped', keptCount.toString()) });
+            self._finishStopAndClose(keptCount > 0 && !rolledBack);
+          });
+          return;
+        }
+
         // Determine status: partial if some docs were created, failure otherwise
         var status = self._createdCount > 0 ? 'partial' : 'failure';
         // Extract the server error message from the response body if available
@@ -836,6 +1068,8 @@ Contributors:
       var chain = Promise.resolve();
       folders.forEach(function(folder) {
         chain = chain.then(function() {
+          return self._awaitResume();
+        }).then(function() {
           self._currentItemPath = folder.relativePath;
           self._currentItemInfo = folder.name;
           var parentRelPath = self._getParentRelativePath(folder.relativePath);
@@ -857,6 +1091,10 @@ Contributors:
               });
           }).then(function(response) {
             pathToId[folder.relativePath] = response.uid;
+            // Track top-level created UUIDs for potential rollback.
+            if (folder.relativePath.indexOf('/') === -1) {
+              self._topLevelCreatedIds.push(response.uid);
+            }
             created++;
             self._createdCount = created;
             self._importProgressValue = created;
@@ -891,11 +1129,14 @@ Contributors:
       var chain = Promise.resolve();
       files.forEach(function(file) {
         chain = chain.then(function() {
+          return self._awaitResume();
+        }).then(function() {
           self._currentItemPath = file.relativePath;
           self._currentItemInfo = file.name + ' (' + self.formatSize(file.size) + ')';
           var parentRelPath = self._getParentRelativePath(file.relativePath);
           var parentId = pathToId[parentRelPath];
           var fileIdx = file.batchFileIndex !== undefined ? file.batchFileIndex : '0';
+          var isTopLevel = file.relativePath.indexOf('/') === -1;
 
           var promise;
           if (file.docType) {
@@ -942,7 +1183,13 @@ Contributors:
             });
           }
 
-          return promise.then(function() {
+          return promise.then(function(response) {
+            // Track top-level created file UUIDs for potential rollback.
+            // FileManager.Import returns the created document; explicit creation
+            // returns the document model directly. Both expose `uid`.
+            if (isTopLevel && response && response.uid) {
+              self._topLevelCreatedIds.push(response.uid);
+            }
             created++;
             self._createdCount = created;
             self._importProgressValue = created;

@@ -28,6 +28,7 @@ Contributors:
     <nuxeo-connection id="nx"></nuxeo-connection>
     <nuxeo-operation id="resolveTypesOp" op="FolderDrop.ResolveTypes"></nuxeo-operation>
     <nuxeo-operation id="notifyDoneOp" op="FolderDrop.NotifyDone"></nuxeo-operation>
+    <nuxeo-operation id="rollbackImportOp" op="FolderDrop.RollbackImport"></nuxeo-operation>
 
     <!-- The action button -->
     <template is="dom-if" if="[[display]]">
@@ -138,6 +139,11 @@ Contributors:
         <div class="success-message">[[_successMessage]]</div>
       </template>
 
+      <!-- "Stopping after current item..." hint -->
+      <template is="dom-if" if="[[_showStoppingHint]]">
+        <div class="progress-label current-file-label">[[i18n('folderDrop.dialog.stopping')]]</div>
+      </template>
+
       <!-- Buttons -->
       <div class="buttons">
         <!-- Cancel / Close -->
@@ -145,10 +151,44 @@ Contributors:
           [[_closeButtonLabel]]
         </paper-button>
 
+        <!-- Stop upload (visible only while uploading) -->
+        <template is="dom-if" if="[[_showStopButton(_uploading, _stopRequested)]]">
+          <paper-button on-tap="_onStopClicked" disabled="[[_stopRequested]]">
+            [[i18n('folderDrop.dialog.stopUpload')]]
+          </paper-button>
+        </template>
+
         <!-- Upload button -->
         <paper-button class="primary" on-tap="_startUpload" disabled="[[!_canUpload]]" hidden="[[!_hasTree]]">
           [[i18n('folderDrop.dialog.upload')]]
         </paper-button>
+      </div>
+    </nuxeo-dialog>
+
+    <!-- Stop confirmation modal -->
+    <nuxeo-dialog id="stopConfirmDialog" opened="[[_showStopConfirm]]" with-backdrop modal>
+      <div>
+        <h2>[[i18n('folderDrop.dialog.confirmStop.title')]]</h2>
+        <template is="dom-if" if="[[!_rollingBack]]">
+          <div>[[_stopConfirmBody(_createdCount)]]</div>
+          <div class="stop-confirm-buttons">
+            <paper-button on-tap="_onConfirmStopResume" raised>
+              [[i18n('folderDrop.dialog.confirmStop.resume')]]
+            </paper-button>
+            <paper-button on-tap="_onConfirmStopKeep" raised>
+              [[_stopKeepLabel(_createdCount)]]
+            </paper-button>
+            <template is="dom-if" if="[[_canRollback(_createdCount)]]">
+              <paper-button on-tap="_onConfirmStopDelete" raised>
+                [[i18n('folderDrop.dialog.confirmStop.stopDelete')]]
+              </paper-button>
+            </template>
+          </div>
+        </template>
+        <template is="dom-if" if="[[_rollingBack]]">
+          <div>[[i18n('folderDrop.dialog.confirmStop.deleting')]]</div>
+          <paper-progress indeterminate class="stop-confirm-progress"></paper-progress>
+        </template>
       </div>
     </nuxeo-dialog>
   </template>
@@ -216,6 +256,8 @@ Contributors:
           var LARGE_FILE_THRESHOLD = 10 * 1024 * 1024; // 10 MB
           files.forEach(function(file, index) {
             chain = chain.then(function() {
+              return self._awaitResume();
+            }).then(function() {
               self._currentFileName = file.name;
               self._currentFileSize = self.formatSize(file.size);
               self._showFileIndeterminate = file.size > LARGE_FILE_THRESHOLD;

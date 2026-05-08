@@ -26,6 +26,9 @@ import org.nuxeo.ecm.automation.core.annotations.Param;
 import org.nuxeo.ecm.core.api.Blob;
 import org.nuxeo.ecm.core.api.Blobs;
 import org.nuxeo.ecm.core.api.CoreSession;
+import org.nuxeo.ecm.core.api.DocumentSecurityException;
+import org.nuxeo.ecm.core.api.PathRef;
+import org.nuxeo.ecm.core.api.security.SecurityConstants;
 import org.nuxeo.runtime.api.Framework;
 
 /**
@@ -63,6 +66,16 @@ public class FolderDropResolveTypesOp {
 
     @OperationMethod
     public Blob run() {
+        // Enforce that the caller is allowed to add children to the target parent.
+        // The configured callback chain receives this parent as input, so without
+        // this check any authenticated user could trigger chain side-effects on
+        // any document they can read.
+        var parentRef = new PathRef(parentPath);
+        if (!session.hasPermission(parentRef, SecurityConstants.ADD_CHILDREN)) {
+            throw new DocumentSecurityException(
+                    "Privilege '" + SecurityConstants.ADD_CHILDREN + "' is not granted to '"
+                            + session.getPrincipal().getName() + "' on document " + parentPath);
+        }
         var service = Framework.getService(FolderDropService.class);
         var result = service.resolveTypes(session, treeJson, parentPath);
         return Blobs.createJSONBlob(result);

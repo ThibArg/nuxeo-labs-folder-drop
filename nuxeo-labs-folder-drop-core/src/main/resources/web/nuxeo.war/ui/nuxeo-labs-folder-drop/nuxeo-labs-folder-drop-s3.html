@@ -80,6 +80,7 @@ Contributors:
     <nuxeo-connection id="nx"></nuxeo-connection>
     <nuxeo-operation id="resolveTypesOp" op="FolderDrop.ResolveTypes"></nuxeo-operation>
     <nuxeo-operation id="notifyDoneOp" op="FolderDrop.NotifyDone"></nuxeo-operation>
+    <nuxeo-operation id="rollbackImportOp" op="FolderDrop.RollbackImport"></nuxeo-operation>
 
     <!-- The action button -->
     <template is="dom-if" if="[[display]]">
@@ -196,6 +197,11 @@ Contributors:
         <div class="success-message">[[_successMessage]]</div>
       </template>
 
+      <!-- "Stopping after current item..." hint -->
+      <template is="dom-if" if="[[_showStoppingHint]]">
+        <div class="progress-label current-file-label">[[i18n('folderDrop.dialog.stopping')]]</div>
+      </template>
+
       <!-- Buttons -->
       <div class="buttons">
         <!-- Cancel / Close -->
@@ -203,10 +209,44 @@ Contributors:
           [[_closeButtonLabel]]
         </paper-button>
 
+        <!-- Stop upload (visible only while uploading) -->
+        <template is="dom-if" if="[[_showStopButton(_uploading, _stopRequested)]]">
+          <paper-button on-tap="_onStopClicked" disabled="[[_stopRequested]]">
+            [[i18n('folderDrop.dialog.stopUpload')]]
+          </paper-button>
+        </template>
+
         <!-- Upload button -->
         <paper-button class="primary" on-tap="_startUpload" disabled="[[!_canUpload]]" hidden="[[!_hasTree]]">
           [[i18n('folderDrop.dialog.upload')]]
         </paper-button>
+      </div>
+    </nuxeo-dialog>
+
+    <!-- Stop confirmation modal -->
+    <nuxeo-dialog id="stopConfirmDialog" opened="[[_showStopConfirm]]" with-backdrop modal>
+      <div>
+        <h2>[[i18n('folderDrop.dialog.confirmStop.title')]]</h2>
+        <template is="dom-if" if="[[!_rollingBack]]">
+          <div>[[_stopConfirmBody(_createdCount)]]</div>
+          <div class="stop-confirm-buttons">
+            <paper-button on-tap="_onConfirmStopResume" autofocus>
+              [[i18n('folderDrop.dialog.confirmStop.resume')]]
+            </paper-button>
+            <paper-button class="secondary" on-tap="_onConfirmStopKeep">
+              [[_stopKeepLabel(_createdCount)]]
+            </paper-button>
+            <template is="dom-if" if="[[_canRollback(_createdCount)]]">
+              <paper-button class="secondary" on-tap="_onConfirmStopDelete">
+                [[i18n('folderDrop.dialog.confirmStop.stopDelete')]]
+              </paper-button>
+            </template>
+          </div>
+        </template>
+        <template is="dom-if" if="[[_rollingBack]]">
+          <div>[[i18n('folderDrop.dialog.confirmStop.deleting')]]</div>
+          <paper-progress indeterminate class="stop-confirm-progress"></paper-progress>
+        </template>
       </div>
     </nuxeo-dialog>
   </template>
@@ -259,9 +299,69 @@ Contributors:
         this._uploadedBytes = 0;
         this._uploadCompletedCount = 0;
         this._perFileLoaded = [];
+        this._stopAdvisoryLogged = false;
         // Cancel any existing batch from UploaderBehavior
         if (this._instance) {
           try { this.cancelBatch(); } catch (e) { /* ignore */ }
+        }
+      },
+
+      /**
+       * Hard-cancel any in-flight S3 batch and reject the upload promise so the
+       * main chain in FolderDropCommonBehavior catches the STOP sentinel.
+       * Called by the two _onConfirmStop* overrides below.
+       */
+      _hardCancelS3Upload: function() {
+        if (!this._uploadReject) {
+          // Upload phase already finished; nothing to cancel here. The common
+          // behavior's _awaitResume() will reject the next per-item step.
+          return;
+        }
+        try {
+          this.cancelBatch();
+        } catch (e) {
+          console.warn('[nuxeo-labs-folder-drop-s3] cancelBatch() failed:', e);
+        }
+        var reject = this._uploadReject;
+        this._uploadResolve = null;
+        this._uploadReject = null;
+        this._hasInFlightFiles = false;
+        this._inFlightFiles = [];
+        reject(new Error(this._STOP_SENTINEL));
+      },
+
+      /**
+       * Override the common Stop-and-Keep handler so we also hard-cancel the
+       * in-flight S3 batch when stop is confirmed during the upload phase.
+       */
+      _onConfirmStopKeep: function() {
+        this._showStopConfirm = false;
+        this._stopShouldRollback = false;
+        var reject = this._stopReject;
+        this._stopResolve = null;
+        this._stopReject = null;
+        if (reject) {
+          reject(new Error(this._STOP_SENTINEL));
+        } else {
+          // No per-item await is pending => we're inside the parallel S3 upload phase.
+          this._hardCancelS3Upload();
+        }
+      },
+
+      /**
+       * Override the common Stop-and-Delete handler — same as above, plus the
+       * common .catch() runs the rollback.
+       */
+      _onConfirmStopDelete: function() {
+        this._showStopConfirm = false;
+        this._stopShouldRollback = true;
+        var reject = this._stopReject;
+        this._stopResolve = null;
+        this._stopReject = null;
+        if (reject) {
+          reject(new Error(this._STOP_SENTINEL));
+        } else {
+          this._hardCancelS3Upload();
         }
       },
 
@@ -358,8 +458,21 @@ Contributors:
 
       _onUploadInterrupted: function(e) {
         var file = e.detail.file;
-        console.warn('[nuxeo-labs-folder-drop-s3] Upload interrupted:',
-          file ? file.name : '(unknown)', e.detail.error);
+        var fileName = file ? file.name : '(unknown)';
+        if (this._stopRequested) {
+          // User-initiated stop: this is expected. Log once per stop, at info level.
+          if (!this._stopAdvisoryLogged) {
+            console.info('[nuxeo-labs-folder-drop-s3] Upload stopped by user. ' +
+              'The S3 provider may log "AbortError: Upload aborted." and ' +
+              '"InputError: Upload requires a AWS client to do uploads with." — ' +
+              'these come from amazon-s3-online-storage and can be ignored.');
+            this._stopAdvisoryLogged = true;
+          }
+          console.info('[nuxeo-labs-folder-drop-s3] Upload aborted (user stop):', fileName);
+        } else {
+          console.warn('[nuxeo-labs-folder-drop-s3] Upload interrupted:',
+            fileName, e.detail.error);
+        }
         // Mark corresponding _items entry as failed so _importFiles skips it
         if (file && file.index !== undefined) {
           var self = this;
