@@ -203,8 +203,8 @@ The plugin ships with **English** (`messages.json`) and **French** (`messages-fr
 To add another language:
 
 1. Open your **Nuxeo Studio** project in **Designer**.
-2. Add a new resource under `Resources` → `web/nuxeo.war/ui/i18n/messages-XX.json` (where `XX` is the target locale code, e.g. `de`, `es`, `it`, `pt-BR`, `ja`, …).
-3. Copy the full content of this plugin's `messages.json` (or `messages-fr.json`) as a starting point and translate every value. All keys are prefixed with `folderDrop.` so they are easy to spot.
+2. in UI > Translations and add a new messages-XX.json` (where `XX` is the target locale code, e.g. `de`, `es`, `it`, `pt-BR`, `ja`, …).
+3. Copy the full content of this plugin's `messages.json` (or `messages-fr.json`) as a starting point and translate every value. All keys are prefixed with `folderDrop.` so they are easy to spot. LIttle warning: copy only the keys, not the opening and closing brackets.
 4. Deploy your Studio project. Web UI picks up the new file automatically based on the user's browser locale.
 
 Keys must stay in sync across all language files — if a key is missing from `messages-XX.json`, Web UI falls back to the English value (or shows the raw key if the English file is also missing it).
