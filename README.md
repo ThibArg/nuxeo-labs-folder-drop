@@ -196,6 +196,19 @@ When the **default** (non-S3) upload element is in use, every dropped file trans
 
 If you expect concurrent folder drops or large total volumes, prefer the **S3 direct upload** variant (see [Enabling the S3 Element](#enabling-the-s3-element)): blobs go straight from the browser to S3, leaving the Nuxeo server out of the data path. The standard guardrails (`maxFiles`, `maxTotalSizeInBytes`) still apply per drop in both modes.
 
+## Localization
+
+The plugin ships with **English** (`messages.json`) and **French** (`messages-fr.json`) translations covering every label of the dialog (action button, drop zone, progress phases, errors, stop/confirm/rollback flow, etc.).
+
+To add another language:
+
+1. Open your **Nuxeo Studio** project in **Designer**.
+2. Add a new resource under `Resources` → `web/nuxeo.war/ui/i18n/messages-XX.json` (where `XX` is the target locale code, e.g. `de`, `es`, `it`, `pt-BR`, `ja`, …).
+3. Copy the full content of this plugin's `messages.json` (or `messages-fr.json`) as a starting point and translate every value. All keys are prefixed with `folderDrop.` so they are easy to spot.
+4. Deploy your Studio project. Web UI picks up the new file automatically based on the user's browser locale.
+
+Keys must stay in sync across all language files — if a key is missing from `messages-XX.json`, Web UI falls back to the English value (or shows the raw key if the English file is also missing it).
+
 ## Scope and Use Cases
 
 This plugin is designed for **end-user convenience**, not for bulk or mass import. For large-scale data migration or automated ingestion, refer to the Nuxeo documentation on [choosing how to import data](https://doc.nuxeo.com/nxdoc/choosing-how-to-import-data-in-the-nuxeo-platform/).
