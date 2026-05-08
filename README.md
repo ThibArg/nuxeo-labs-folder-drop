@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-Drag-and-drop folder import for Nuxeo Web UI (LTS 2025). Drop folders from your desktop onto any Folderish document to create the full hierarchy in Nuxeo. Supports S3 direct upload, configurable file filtering, custom document type resolution via callback chain, and a server-side event on completion.
+Drag-and-drop folder import for Nuxeo Web UI (LTS 2025). Drop folders from your desktop onto any Folderish document to create the full hierarchy in Nuxeo. Supports S3 direct upload, configurable file filtering, custom document type resolution via callback chain, and a server-side event on completion. Includes a Stop button that pauses the import and lets the user keep or permanently delete what was already created.
 
 > [!NOTE]
 > This is Work In Progress - Not ready for use
@@ -58,10 +58,15 @@ Once the import completes, a success message is displayed. Clicking **Close** re
 While the upload is in progress (during file upload, type resolution, folder creation or file import) a **Stop upload** button is shown next to Cancel/Close. Clicking it:
 
 1. Pauses the workflow as soon as the current item finishes (a "Stopping after the current item finishes..." hint is shown), and
+
+<img src="README-Images/04-StopRequested.png" alt="Stop requested" width="500">
+
 2. Opens a confirmation dialog with three choices:
    - **Resume upload** — clears the stop request and the import continues from where it paused.
    - **Stop and keep imported items** — aborts the import. Any folder or file already created in Nuxeo **remains in the system**. The temporary upload batch on the server is cleaned up.
-   - **Stop and permanently delete imported items** *(only shown if at least one document was already created)* — aborts the import **and** permanently removes (NOT trash) every top-level item that was created so far. Nuxeo cascades the deletion to all children automatically. This is **irreversible**.
+   - **Stop and permanently delete imported items** *(only shown if at least one document was already created)* — aborts the import **and** permanently removes (NOT trash) every top-level item that was created so far. Nuxeo cascades the deletion to all children automatically. This is **irreversible**. Implemented by the `FolderDrop.RollbackImport` operation — see [Server-Side API](#server-side-api).
+
+<img src="README-Images/08-StopConfirm.png" alt="Stop confirmation dialog" width="500">
 
 Notes:
 
@@ -184,6 +189,12 @@ org.nuxeo.web.ui.folderDrop.mimeTypeDenyPatterns=video/.*,application/x-executab
 ```
 
 These properties can also be overridden via an XML contribution to `org.nuxeo.runtime.ConfigurationService`.
+
+### Server Resource Considerations (Non-S3 Mode)
+
+When the **default** (non-S3) upload element is in use, every dropped file transits through the Nuxeo server: the browser uploads each blob to a server-side **TransientStore** (disk-backed by default), and the import phase reads from there to create the documents. Concurrent drops by multiple users can therefore consume noticeable disk space and I/O on the Nuxeo node hosting the upload, until the transient entries are consumed or expire.
+
+If you expect concurrent folder drops or large total volumes, prefer the **S3 direct upload** variant (see [Enabling the S3 Element](#enabling-the-s3-element)): blobs go straight from the browser to S3, leaving the Nuxeo server out of the data path. The standard guardrails (`maxFiles`, `maxTotalSizeInBytes`) still apply per drop in both modes.
 
 ## Scope and Use Cases
 
